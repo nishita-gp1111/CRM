@@ -135,7 +135,7 @@ export function CustomPropertyManager({
                 {editing ? "カスタム項目を編集" : "カスタム項目を追加"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                内部名はCSVの列名とAPIキーにも使用します。
+                内部名はインポート列とCRM内の保存キーに使用します。
               </p>
             </div>
             {editing ? (

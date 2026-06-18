@@ -9,6 +9,8 @@ import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/security";
 import { importExecuteSchema } from "@/lib/validation";
 
+type ImportTx = Prisma.TransactionClient;
+
 export async function POST(request: Request) {
   try {
     const context = await getAuthContext();
@@ -147,6 +149,20 @@ export async function POST(request: Request) {
                     customFields,
                   },
                 });
+            const company = await findOrCreateCompanyForImport(tx, {
+              organizationId: context.organization.id,
+              ownerUserId,
+              companyName: row.companyName,
+              companyDomain: row.companyDomain,
+            });
+            if (company)
+              await setPrimaryAssociation(tx, {
+                organizationId: context.organization.id,
+                sourceObjectType: "CONTACT",
+                sourceObjectId: item.id,
+                targetObjectType: "COMPANY",
+                targetObjectId: company.id,
+              });
             await createRecordActivity(tx, {
               organizationId: context.organization.id,
               actorUserId: context.user.id,
@@ -154,18 +170,14 @@ export async function POST(request: Request) {
               objectId: item.id,
               type: "SYSTEM_EVENT",
               title: existing
-                ? "CSVインポートで更新しました"
-                : "CSVインポートで作成しました",
+                ? "インポートで更新しました"
+                : "インポートで作成しました",
               metadata: { importJobId: job.id, row: index + 2 },
             });
           });
         } else if (input.objectType === "COMPANY") {
           if (!row.name) throw new Error("会社名が必要です。");
-          const domain =
-            row.domain
-              ?.toLowerCase()
-              .replace(/^https?:\/\//, "")
-              .replace(/\/.*$/, "") || null;
+          const domain = normalizeDomain(row.domain);
           const existing = domain
             ? await prisma.company.findUnique({
                 where: {
@@ -251,8 +263,8 @@ export async function POST(request: Request) {
               objectId: item.id,
               type: "SYSTEM_EVENT",
               title: existing
-                ? "CSVインポートで更新しました"
-                : "CSVインポートで作成しました",
+                ? "インポートで更新しました"
+                : "インポートで作成しました",
               metadata: { importJobId: job.id, row: index + 2 },
             });
           });
@@ -379,6 +391,33 @@ export async function POST(request: Request) {
                     organizationId: context.organization.id,
                   },
                 });
+            const company = await findOrCreateCompanyForImport(tx, {
+              organizationId: context.organization.id,
+              ownerUserId,
+              companyName: row.companyName,
+              companyDomain: row.companyDomain,
+            });
+            if (company)
+              await setPrimaryAssociation(tx, {
+                organizationId: context.organization.id,
+                sourceObjectType: "DEAL",
+                sourceObjectId: item.id,
+                targetObjectType: "COMPANY",
+                targetObjectId: company.id,
+              });
+            const contact = await findOrCreateContactForImport(tx, {
+              organizationId: context.organization.id,
+              ownerUserId,
+              contactEmail: row.contactEmail,
+            });
+            if (contact)
+              await setPrimaryAssociation(tx, {
+                organizationId: context.organization.id,
+                sourceObjectType: "DEAL",
+                sourceObjectId: item.id,
+                targetObjectType: "CONTACT",
+                targetObjectId: contact.id,
+              });
             await createRecordActivity(tx, {
               organizationId: context.organization.id,
               actorUserId: context.user.id,
@@ -386,8 +425,8 @@ export async function POST(request: Request) {
               objectId: item.id,
               type: "SYSTEM_EVENT",
               title: existing
-                ? "CSVインポートで更新しました"
-                : "CSVインポートで作成しました",
+                ? "インポートで更新しました"
+                : "インポートで作成しました",
               metadata: { importJobId: job.id, row: index + 2 },
             });
           });
@@ -438,4 +477,146 @@ export async function POST(request: Request) {
   } catch (error) {
     return apiError(error);
   }
+}
+
+function normalizeDomain(value?: string | null) {
+  const domain = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+  return domain || null;
+}
+
+async function findOrCreateCompanyForImport(
+  tx: ImportTx,
+  input: {
+    organizationId: string;
+    ownerUserId: string;
+    companyName?: string;
+    companyDomain?: string;
+  },
+) {
+  const domain = normalizeDomain(input.companyDomain);
+  const name = input.companyName?.trim();
+  if (!domain && !name) return null;
+
+  const existing = domain
+    ? await tx.company.findUnique({
+        where: {
+          organizationId_domain: {
+            organizationId: input.organizationId,
+            domain,
+          },
+        },
+      })
+    : await tx.company.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          name,
+          deletedAt: null,
+        },
+      });
+
+  if (existing) {
+    return tx.company.update({
+      where: { id: existing.id },
+      data: {
+        deletedAt: null,
+        name: name || existing.name,
+        domain: domain ?? existing.domain,
+      },
+    });
+  }
+
+  return tx.company.create({
+    data: {
+      organizationId: input.organizationId,
+      ownerUserId: input.ownerUserId,
+      name: name || domain || "会社名未設定",
+      domain,
+    },
+  });
+}
+
+async function findOrCreateContactForImport(
+  tx: ImportTx,
+  input: {
+    organizationId: string;
+    ownerUserId: string;
+    contactEmail?: string;
+  },
+) {
+  if (!input.contactEmail) return null;
+  const email = normalizeEmail(input.contactEmail);
+  if (!email) return null;
+
+  const existing = await tx.contact.findUnique({
+    where: {
+      organizationId_email: {
+        organizationId: input.organizationId,
+        email,
+      },
+    },
+  });
+
+  if (existing)
+    return tx.contact.update({
+      where: { id: existing.id },
+      data: { deletedAt: null },
+    });
+
+  return tx.contact.create({
+    data: {
+      organizationId: input.organizationId,
+      ownerUserId: input.ownerUserId,
+      email,
+    },
+  });
+}
+
+async function setPrimaryAssociation(
+  tx: ImportTx,
+  input: {
+    organizationId: string;
+    sourceObjectType: "CONTACT" | "COMPANY" | "DEAL";
+    sourceObjectId: string;
+    targetObjectType: "CONTACT" | "COMPANY" | "DEAL";
+    targetObjectId: string;
+  },
+) {
+  await tx.objectAssociation.updateMany({
+    where: {
+      organizationId: input.organizationId,
+      sourceObjectType: input.sourceObjectType,
+      sourceObjectId: input.sourceObjectId,
+      targetObjectType: input.targetObjectType,
+      isPrimary: true,
+      NOT: { targetObjectId: input.targetObjectId },
+    },
+    data: { isPrimary: false },
+  });
+
+  await tx.objectAssociation.upsert({
+    where: {
+      organizationId_sourceObjectType_sourceObjectId_targetObjectType_targetObjectId:
+        {
+          organizationId: input.organizationId,
+          sourceObjectType: input.sourceObjectType,
+          sourceObjectId: input.sourceObjectId,
+          targetObjectType: input.targetObjectType,
+          targetObjectId: input.targetObjectId,
+        },
+    },
+    update: { isPrimary: true },
+    create: {
+      organizationId: input.organizationId,
+      sourceObjectType: input.sourceObjectType,
+      sourceObjectId: input.sourceObjectId,
+      targetObjectType: input.targetObjectType,
+      targetObjectId: input.targetObjectId,
+      isPrimary: true,
+    },
+  });
 }

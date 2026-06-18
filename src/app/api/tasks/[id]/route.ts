@@ -6,5 +6,105 @@ import { prisma } from "@/lib/prisma";
 import { canEditTask } from "@/lib/tasks";
 import { taskSchema } from "@/lib/validation";
 type Params = { params: Promise<{ id: string }> };
-export async function PATCH(request: Request, { params }: Params) { try { const context = await getAuthContext(); if (!context) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 }); const { id } = await params; const current = await prisma.task.findFirst({ where: { id, organizationId: context.organization.id } }); if (!current) return NextResponse.json({ message: "タスクが見つかりません。" }, { status: 404 }); await canEditTask(context, current.ownerUserId); const input = taskSchema.parse(await request.json()); await validateOwner(context.organization.id, input.ownerUserId); if (input.relatedObjectType && input.relatedObjectId) await assertObjectAccess(context, input.relatedObjectType, input.relatedObjectId); const item = await prisma.task.update({ where: { id }, data: { ownerUserId: input.ownerUserId, title: input.title, description: input.description, dueDate: input.dueDate, status: input.status, priority: input.priority, taskType: input.taskType, completedAt: input.status === "COMPLETED" ? current.completedAt ?? new Date() : null } }); return NextResponse.json({ item }); } catch (error) { return apiError(error); } }
-export async function DELETE(_: Request, { params }: Params) { try { const context = await getAuthContext(); if (!context) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 }); const { id } = await params; const current = await prisma.task.findFirst({ where: { id, organizationId: context.organization.id } }); if (!current) return NextResponse.json({ message: "タスクが見つかりません。" }, { status: 404 }); await canEditTask(context, current.ownerUserId); await prisma.$transaction([prisma.objectAssociation.deleteMany({ where: { organizationId: context.organization.id, sourceObjectType: "TASK", sourceObjectId: id } }), prisma.task.delete({ where: { id } })]); return NextResponse.json({ ok: true }); } catch (error) { return apiError(error); } }
+export async function PATCH(request: Request, { params }: Params) {
+  try {
+    const context = await getAuthContext();
+    if (!context)
+      return NextResponse.json(
+        { message: "ログインが必要です。" },
+        { status: 401 },
+      );
+    const { id } = await params;
+    const current = await prisma.task.findFirst({
+      where: { id, organizationId: context.organization.id },
+    });
+    if (!current)
+      return NextResponse.json(
+        { message: "タスクが見つかりません。" },
+        { status: 404 },
+      );
+    await canEditTask(context, current.ownerUserId);
+    const body = await request.json();
+    const input = taskSchema.parse(body);
+    await validateOwner(context.organization.id, input.ownerUserId);
+    if (input.relatedObjectType && input.relatedObjectId)
+      await assertObjectAccess(
+        context,
+        input.relatedObjectType,
+        input.relatedObjectId,
+      );
+    const item = await prisma.$transaction(async (tx) => {
+      const updated = await tx.task.update({
+        where: { id },
+        data: {
+          ownerUserId: input.ownerUserId,
+          title: input.title,
+          description: input.description,
+          dueDate: input.dueDate,
+          status: input.status,
+          priority: input.priority,
+          taskType: input.taskType,
+          completedAt:
+            input.status === "COMPLETED"
+              ? (current.completedAt ?? new Date())
+              : null,
+        },
+      });
+      await tx.objectAssociation.deleteMany({
+        where: {
+          organizationId: context.organization.id,
+          sourceObjectType: "TASK",
+          sourceObjectId: id,
+          targetObjectType: { in: ["CONTACT", "COMPANY", "DEAL"] },
+        },
+      });
+      if (input.relatedObjectType && input.relatedObjectId)
+        await tx.objectAssociation.create({
+          data: {
+            organizationId: context.organization.id,
+            sourceObjectType: "TASK",
+            sourceObjectId: id,
+            targetObjectType: input.relatedObjectType,
+            targetObjectId: input.relatedObjectId,
+          },
+        });
+      return updated;
+    });
+    return NextResponse.json({ item });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+export async function DELETE(_: Request, { params }: Params) {
+  try {
+    const context = await getAuthContext();
+    if (!context)
+      return NextResponse.json(
+        { message: "ログインが必要です。" },
+        { status: 401 },
+      );
+    const { id } = await params;
+    const current = await prisma.task.findFirst({
+      where: { id, organizationId: context.organization.id },
+    });
+    if (!current)
+      return NextResponse.json(
+        { message: "タスクが見つかりません。" },
+        { status: 404 },
+      );
+    await canEditTask(context, current.ownerUserId);
+    await prisma.$transaction([
+      prisma.objectAssociation.deleteMany({
+        where: {
+          organizationId: context.organization.id,
+          sourceObjectType: "TASK",
+          sourceObjectId: id,
+        },
+      }),
+      prisma.task.delete({ where: { id } }),
+    ]);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return apiError(error);
+  }
+}

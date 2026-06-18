@@ -49,7 +49,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="m-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <p className="text-xs font-bold text-brand-100">PHASE 5</p>
+        <p className="text-xs font-bold text-brand-100">CRM READY</p>
         <p className="mt-2 text-sm leading-6 text-white/60">
           集客から商談化までを一つのCRMで管理できます。
         </p>

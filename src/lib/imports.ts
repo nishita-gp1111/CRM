@@ -14,6 +14,8 @@ export const importFields: Record<ImportObjectType, ImportField[]> = {
     { value: "source", label: "流入元" },
     { value: "memo", label: "メモ" },
     { value: "ownerEmail", label: "担当者メール" },
+    { value: "companyName", label: "会社名" },
+    { value: "companyDomain", label: "会社ドメイン" },
   ],
   COMPANY: [
     { value: "name", label: "会社名", required: true },
@@ -40,6 +42,9 @@ export const importFields: Record<ImportObjectType, ImportField[]> = {
     { value: "pipelineName", label: "パイプライン名" },
     { value: "stageName", label: "ステージ名" },
     { value: "ownerEmail", label: "担当者メール" },
+    { value: "companyName", label: "会社名" },
+    { value: "companyDomain", label: "会社ドメイン" },
+    { value: "contactEmail", label: "連絡先メール" },
   ],
 };
 

@@ -47,8 +47,8 @@ export default async function ImportsPage() {
     <div className="mx-auto max-w-7xl">
       <PageHeading
         eyebrow="Data import"
-        title="CSVインポート"
-        description="文字コードを判定し、列をマッピングして一括作成・更新します。"
+        title="データインポート"
+        description="CSV、XLSX、貼り付けた表データをマッピングして一括作成・更新します。"
       />
       <ImportWizard fields={fields} />
     </div>

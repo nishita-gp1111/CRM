@@ -148,7 +148,6 @@ model User {
   createdTasks      Task[]               @relation("TaskCreator")
   uploadedImports   ImportJob[]
   createdTemplates  EmailTemplate[]
-  emailAccounts     EmailAccount[]
   availabilityRules AvailabilityRule[]
   meetingLinks      MeetingLink[]
   auditLogs         AuditLog[]
@@ -176,7 +175,6 @@ model Organization {
   associations      ObjectAssociation[]
   customProperties  CustomProperty[]
   importJobs        ImportJob[]
-  emailAccounts     EmailAccount[]
   emailTemplates    EmailTemplate[]
   availabilityRules AvailabilityRule[]
   meetingLinks      MeetingLink[]
@@ -510,24 +508,6 @@ model SavedView {
   @@unique([organizationId, userId, objectType, name])
   @@index([organizationId, objectType, isShared])
   @@map("saved_views")
-}
-
-model EmailAccount {
-  id                    String   @id @default(uuid()) @db.Uuid
-  organizationId        String   @map("organization_id") @db.Uuid
-  userId                String   @map("user_id") @db.Uuid
-  provider              String   @db.VarChar(40)
-  email                 String   @db.VarChar(320)
-  accessTokenEncrypted  String?  @map("access_token_encrypted")
-  refreshTokenEncrypted String?  @map("refresh_token_encrypted")
-  connectedAt           DateTime @map("connected_at") @db.Timestamptz(3)
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, userId, provider, email])
-  @@map("email_accounts")
 }
 
 model EmailTemplate {

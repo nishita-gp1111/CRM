@@ -128,7 +128,7 @@ npm run build
 - 組織追加、組織切り替え
 - メンバー招待、メンバー一覧、ロール変更
 - PC優先かつモバイル対応のサイドバー/ボトムナビ
-- Phase 2以降の各機能へつながるプレースホルダー画面
+- CRM各機能へつながる実画面
 
 ## Phase 2の実装範囲
 
@@ -158,8 +158,10 @@ npm run build
 ## Phase 4の実装範囲
 
 - UTF-8 / UTF-8 BOM / Shift_JIS対応のCSVプレビュー
-- CSV列と標準・カスタム項目のマッピング
+- Google Sheets / ExcelからダウンロードしたXLSX、TSV、表データ貼り付けのプレビュー
+- スプレッドシート列と標準・カスタム項目のマッピング
 - 連絡先メール、会社ドメイン、商談外部IDによる重複判定
+- 連絡先と会社、商談と会社/連絡先の自動関連付け
 - 新規作成のみ / 更新を含むインポートモードと行単位エラー結果
 - 連絡先・会社・商談のUTF-8 BOM付きCSVエクスポート
 - 現在の検索条件を個人ビューとして保存・呼び出し・削除
@@ -196,7 +198,7 @@ npm run build
 - `Contact` / `Company` / `Deal`
 - `ObjectAssociation` / `Activity` / `Task`
 - `CustomProperty` / `ImportJob` / `SavedView`
-- `EmailAccount` / `EmailTemplate`
+- `EmailTemplate`
 - `AvailabilityRule` / `MeetingLink` / `MeetingBooking`
 - `Form` / `FormSubmission` / `Conversation`
 
@@ -214,8 +216,8 @@ npm run build
 | `POST`         | `/api/organizations/invitations`       | 招待URLを発行            |
 | `GET` / `POST` | `/api/invitations/:token`              | 招待確認 / 承認          |
 | `PATCH`        | `/api/organizations/members/:memberId` | ロール・状態変更         |
-| `POST`         | `/api/imports/preview`                 | CSV解析とプレビュー      |
-| `POST`         | `/api/imports/execute`                 | CSVインポート実行        |
+| `POST`         | `/api/imports/preview`                 | CSV/XLSX/貼り付け解析    |
+| `POST`         | `/api/imports/execute`                 | データインポート実行     |
 | `GET`          | `/api/exports/:objectType`             | CSVエクスポート          |
 | `GET` / `POST` | `/api/saved-views`                     | 保存ビュー一覧 / 作成    |
 | `GET` / `POST` | `/api/custom-properties`               | カスタム項目一覧 / 作成  |
@@ -232,6 +234,4 @@ npm run build
 
 ## 残タスク
 
-- メール認証メールと招待メールの配送プロバイダー連携
-- Gmail / Outlook / Googleカレンダー等の外部OAuth連携
 - PostgreSQLを使ったAPI統合テストとPlaywright E2E

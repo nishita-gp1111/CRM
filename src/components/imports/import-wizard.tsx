@@ -7,10 +7,61 @@ type Preview = {
   rows: Record<string, string>[];
   sample: Record<string, string>[];
   encoding: string;
+  sourceName: string;
+  sheetName?: string;
   totalRows: number;
   truncated: boolean;
 };
 const labels = { CONTACT: "連絡先", COMPANY: "会社", DEAL: "商談" };
+const aliases: Record<
+  "CONTACT" | "COMPANY" | "DEAL",
+  Record<string, string[]>
+> = {
+  CONTACT: {
+    lastName: ["姓", "名字", "lastName", "last_name"],
+    firstName: ["名", "名前", "firstName", "first_name"],
+    email: ["メール", "メールアドレス", "email", "e-mail"],
+    phone: ["電話", "電話番号", "tel"],
+    mobilePhone: ["携帯", "携帯電話", "mobile"],
+    jobTitle: ["役職", "肩書き", "jobTitle"],
+    lifecycleStage: ["ライフサイクル", "ステージ"],
+    leadStatus: ["リードステータス", "状態", "status"],
+    source: ["流入元", "獲得経路", "source"],
+    memo: ["メモ", "備考", "notes"],
+    ownerEmail: ["担当者", "担当者メール", "owner"],
+    companyName: ["会社", "会社名", "法人名", "企業名"],
+    companyDomain: ["ドメイン", "会社ドメイン"],
+  },
+  COMPANY: {
+    name: ["会社", "会社名", "法人名", "企業名", "name"],
+    domain: ["ドメイン", "domain"],
+    phone: ["電話", "電話番号", "tel"],
+    industry: ["業種", "industry"],
+    address: ["住所", "address"],
+    city: ["市区町村", "市町村", "city"],
+    prefecture: ["都道府県", "prefecture"],
+    postalCode: ["郵便番号", "postalCode", "zip"],
+    websiteUrl: ["Webサイト", "URL", "website"],
+    employeeCount: ["従業員数", "社員数"],
+    annualRevenue: ["年間売上", "売上"],
+    ownerEmail: ["担当者", "担当者メール", "owner"],
+  },
+  DEAL: {
+    name: ["商談", "商談名", "案件名", "dealName", "name"],
+    amount: ["金額", "受注金額", "売上見込", "amount"],
+    expectedCloseDate: ["受注予定日", "予定日", "expectedCloseDate"],
+    closeDate: ["クローズ日", "受注日", "closeDate"],
+    source: ["流入元", "獲得経路", "source"],
+    lostReason: ["失注理由", "lostReason"],
+    externalId: ["外部ID", "externalId", "id"],
+    pipelineName: ["パイプライン", "パイプライン名"],
+    stageName: ["ステージ", "ステージ名", "状態"],
+    ownerEmail: ["担当者", "担当者メール", "owner"],
+    companyName: ["会社", "会社名", "法人名", "企業名"],
+    companyDomain: ["ドメイン", "会社ドメイン"],
+    contactEmail: ["連絡先メール", "担当者メールアドレス", "顧客メール"],
+  },
+};
 export function ImportWizard({
   fields,
 }: {
@@ -39,10 +90,7 @@ export function ImportWizard({
     if (!response.ok) return setError(result.message);
     const auto: Record<string, string> = {};
     for (const header of result.headers) {
-      const normalized = header.toLowerCase().replace(/[ _-]/g, "");
-      const found = fields[objectType].find(
-        (f) => f.label === header || f.value.toLowerCase() === normalized,
-      );
+      const found = guessField(objectType, header, fields[objectType]);
       if (found) auto[header] = found.value;
     }
     setMapping(auto);
@@ -71,7 +119,7 @@ export function ImportWizard({
   return (
     <div className="space-y-6">
       <section className="card p-6">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_2fr]">
           <label>
             <span className="field-label">インポート対象</span>
             <select
@@ -80,6 +128,7 @@ export function ImportWizard({
               onChange={(e) => {
                 setObjectType(e.target.value as typeof objectType);
                 setPreview(null);
+                setMapping({});
               }}
             >
               <option value="CONTACT">連絡先</option>
@@ -100,18 +149,23 @@ export function ImportWizard({
               </option>
             </select>
           </label>
-          <form onSubmit={upload}>
-            <span className="field-label">CSVファイル</span>
-            <div className="flex gap-2">
-              <input
-                className="text-field"
-                name="file"
-                type="file"
-                accept=".csv,text/csv"
-                required
-              />
+          <form onSubmit={upload} className="lg:col-span-1">
+            <span className="field-label">ファイル</span>
+            <input
+              className="text-field"
+              name="file"
+              type="file"
+              accept=".csv,.tsv,.txt,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            />
+            <span className="field-label mt-3">貼り付け</span>
+            <textarea
+              className="text-field min-h-24"
+              name="pastedTable"
+              placeholder="列名を含む表データ"
+            />
+            <div className="mt-3 flex justify-end">
               <button className="primary-button" disabled={pending}>
-                読込
+                {pending ? "読込中..." : "読込"}
               </button>
             </div>
           </form>
@@ -130,7 +184,15 @@ export function ImportWizard({
                 対象: <strong>{labels[objectType]}</strong>
               </span>
               <span>
-                文字コード: <strong>{preview.encoding}</strong>
+                取込元: <strong>{preview.sourceName}</strong>
+              </span>
+              {preview.sheetName ? (
+                <span>
+                  シート: <strong>{preview.sheetName}</strong>
+                </span>
+              ) : null}
+              <span>
+                形式: <strong>{preview.encoding}</strong>
               </span>
               <span>
                 行数: <strong>{preview.totalRows}</strong>
@@ -213,4 +275,23 @@ export function ImportWizard({
       ) : null}
     </div>
   );
+}
+
+function guessField(
+  objectType: "CONTACT" | "COMPANY" | "DEAL",
+  header: string,
+  fields: Field[],
+) {
+  const normalized = normalizeImportKey(header);
+  return fields.find((field) => {
+    if (normalizeImportKey(field.label) === normalized) return true;
+    if (normalizeImportKey(field.value) === normalized) return true;
+    return aliases[objectType][field.value]?.some(
+      (alias) => normalizeImportKey(alias) === normalized,
+    );
+  });
+}
+
+function normalizeImportKey(value: string) {
+  return value.toLowerCase().replace(/[ _\-ー‐‑‒–—―　（）()［\][\].・/]/g, "");
 }
