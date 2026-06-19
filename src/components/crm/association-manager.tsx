@@ -16,7 +16,7 @@ type Related = {
 };
 
 const paths = { CONTACT: "contacts", COMPANY: "companies", DEAL: "deals" };
-const labels = { CONTACT: "コンタクト", COMPANY: "会社", DEAL: "商談" };
+const labels = { CONTACT: "担当者", COMPANY: "会社", DEAL: "商談" };
 
 export function AssociationManager({
   objectType,

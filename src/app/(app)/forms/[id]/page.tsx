@@ -41,7 +41,7 @@ export default async function FormSubmissionsPage({
             <thead className="bg-canvas text-xs text-slate-500">
               <tr>
                 <th className="px-6 py-3">送信日時</th>
-                <th className="px-6 py-3">コンタクト</th>
+                <th className="px-6 py-3">担当者</th>
                 <th className="px-6 py-3">メール</th>
                 <th className="px-6 py-3">内容</th>
               </tr>

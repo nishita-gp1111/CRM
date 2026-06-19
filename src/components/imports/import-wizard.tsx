@@ -12,7 +12,7 @@ type Preview = {
   totalRows: number;
   truncated: boolean;
 };
-const labels = { CONTACT: "コンタクト", COMPANY: "会社", DEAL: "商談" };
+const labels = { CONTACT: "担当者", COMPANY: "会社", DEAL: "商談" };
 const aliases: Record<
   "CONTACT" | "COMPANY" | "DEAL",
   Record<string, string[]>
@@ -45,6 +45,12 @@ const aliases: Record<
     employeeCount: ["従業員数", "社員数"],
     annualRevenue: ["年間売上", "売上"],
     ownerEmail: ["担当者", "担当者メール", "owner"],
+    contactName: ["担当者氏名", "窓口氏名", "顧客担当者"],
+    contactEmail: ["担当者メール", "担当者メールアドレス"],
+    contactPhone: ["担当者電話", "担当者電話番号"],
+    contactJobTitle: ["担当者役職", "役職"],
+    contactLabel: ["担当者区分", "関係ラベル", "窓口区分"],
+    contactIsPrimary: ["主担当者", "主担当者フラグ"],
   },
   DEAL: {
     name: ["商談", "商談名", "案件名", "dealName", "name"],
@@ -59,7 +65,7 @@ const aliases: Record<
     ownerEmail: ["担当者", "担当者メール", "owner"],
     companyName: ["会社", "会社名", "法人名", "企業名"],
     companyDomain: ["ドメイン", "会社ドメイン"],
-    contactEmail: ["コンタクトメール", "担当者メールアドレス", "顧客メール"],
+    contactEmail: ["担当者メール", "担当者メールアドレス", "顧客メール"],
   },
 };
 export function ImportWizard({
@@ -69,7 +75,7 @@ export function ImportWizard({
 }) {
   const router = useRouter();
   const [objectType, setObjectType] = useState<"CONTACT" | "COMPANY" | "DEAL">(
-    "CONTACT",
+    "COMPANY",
   );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -131,7 +137,6 @@ export function ImportWizard({
                 setMapping({});
               }}
             >
-              <option value="CONTACT">コンタクト</option>
               <option value="COMPANY">会社</option>
               <option value="DEAL">商談</option>
             </select>

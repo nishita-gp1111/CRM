@@ -24,6 +24,14 @@
 - Added `selectedBusinessUnitId` to `OrganizationMember` so the app can persist the user's current business unit per organization.
 - Kept customer master data shared across the organization. Contacts and companies are not duplicated per business unit.
 
+## Phase 1.5 correction
+
+- Business units are not read ACL boundaries.
+- Every active organization member can see every active business unit in the same organization, including the "all business units" view.
+- `BusinessUnitMembership` is used for primary affiliation, IS / FS / CS work function, assignee suggestions, KPI attribution, daily input scope, and manager scope. It is not used to decide whether a user can read deals, pipelines, forms, or dashboards.
+- Cross-organization isolation is still mandatory. A selected `businessUnitId` must belong to the active organization and be active.
+- Contact remains an internal data model, but the user-facing UI calls it 担当者 and removes the standalone contact list/detail/new page navigation.
+
 ## Rejected alternatives
 
 - Hard-coding 第1事業部 and HD事業部 in application logic was rejected. They are seed data and can be edited in settings.

@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 const items = [
-  { href: "/contacts", label: "コンタクト" },
   { href: "/companies", label: "会社" },
   { href: "/deals", label: "商談" },
   { href: "/deals/board", label: "パイプライン" },
@@ -10,7 +9,7 @@ const items = [
 export function ObjectNav({
   active,
 }: {
-  active: "contacts" | "companies" | "deals" | "board";
+  active: "companies" | "deals" | "board";
 }) {
   return (
     <nav className="mb-5 flex flex-wrap gap-1 border-b border-line pb-3">

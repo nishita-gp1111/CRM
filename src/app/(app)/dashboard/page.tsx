@@ -128,7 +128,7 @@ export default async function DashboardPage() {
       "dashboard",
     ],
     [
-      "今月の新規コンタクト",
+      "今月の新規担当者",
       newContacts.toLocaleString("ja-JP"),
       "新しく登録",
       "contacts",

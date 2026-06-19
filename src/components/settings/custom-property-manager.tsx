@@ -30,7 +30,7 @@ type Property = {
 };
 
 const objectLabels: Record<ObjectType, string> = {
-  CONTACT: "コンタクト",
+  CONTACT: "担当者",
   COMPANY: "会社",
   DEAL: "商談",
 };

@@ -12,22 +12,22 @@ const items = [
     activePrefixes: ["/dashboard"],
   },
   {
-    href: "/contacts",
-    label: "顧客",
+    href: "/companies",
+    label: "会社",
     icon: "contacts",
-    activePrefixes: ["/contacts", "/companies", "/deals"],
+    activePrefixes: ["/companies"],
+  },
+  {
+    href: "/deals",
+    label: "商談",
+    icon: "deals",
+    activePrefixes: ["/deals"],
   },
   {
     href: "/tasks",
     label: "タスク",
     icon: "tasks",
     activePrefixes: ["/tasks"],
-  },
-  {
-    href: "/imports",
-    label: "取込",
-    icon: "import",
-    activePrefixes: ["/imports"],
   },
   {
     href: "/settings",

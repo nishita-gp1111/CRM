@@ -30,7 +30,7 @@ export default function AuthLayout({
             チーム全員に見える形へ。
           </h1>
           <p className="mt-7 max-w-lg text-base leading-8 text-white/65">
-            コンタクト、会社、商談、活動履歴を一つの流れに整理する、日本の営業チーム向けCRMです。
+            担当者、会社、商談、活動履歴を一つの流れに整理する、日本の営業チーム向けCRMです。
           </p>
           <div className="mt-10 grid max-w-lg grid-cols-3 gap-3">
             {[

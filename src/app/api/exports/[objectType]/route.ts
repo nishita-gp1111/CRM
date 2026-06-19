@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ObjectType } from "@prisma/client";
 import { apiError, getRequestMetadata } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { makeCsv } from "@/lib/csv";
@@ -52,7 +53,48 @@ export async function GET(request: Request, { params }: Params) {
         include: { owner: { select: { email: true } } },
         orderBy: { createdAt: "asc" },
       });
+      const links = await prisma.objectAssociation.findMany({
+        where: {
+          organizationId: context.organization.id,
+          targetObjectType: ObjectType.COMPANY,
+          targetObjectId: { in: items.map((item) => item.id) },
+          sourceObjectType: ObjectType.CONTACT,
+          isPrimary: true,
+        },
+      });
+      const contacts = await prisma.contact.findMany({
+        where: {
+          organizationId: context.organization.id,
+          id: { in: links.map((link) => link.sourceObjectId) },
+          deletedAt: null,
+        },
+      });
+      const contactById = new Map(
+        contacts.map((contact) => [contact.id, contact]),
+      );
+      const primaryContactByCompanyId = new Map(
+        links
+          .map(
+            (link) =>
+              [
+                link.targetObjectId,
+                contactById.get(link.sourceObjectId),
+              ] as const,
+          )
+          .filter(([, contact]) => Boolean(contact)),
+      );
       rows = items.map((x) => ({
+        主担当者氏名: (() => {
+          const contact = primaryContactByCompanyId.get(x.id);
+          return contact
+            ? `${contact.lastName ?? ""} ${contact.firstName ?? ""}`.trim()
+            : "";
+        })(),
+        主担当者メール: primaryContactByCompanyId.get(x.id)?.email,
+        主担当者電話番号:
+          primaryContactByCompanyId.get(x.id)?.phone ??
+          primaryContactByCompanyId.get(x.id)?.mobilePhone,
+        主担当者役職: primaryContactByCompanyId.get(x.id)?.jobTitle,
         会社名: x.name,
         ドメイン: x.domain,
         電話番号: x.phone,

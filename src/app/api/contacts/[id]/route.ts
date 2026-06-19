@@ -36,7 +36,7 @@ export async function GET(_: Request, { params }: Params) {
     const item = await findContact(context.organization.id, id);
     if (!item)
       return NextResponse.json(
-        { message: "コンタクトが見つかりません。" },
+        { message: "担当者が見つかりません。" },
         { status: 404 },
       );
     if (!(await canViewRecord(context, item.ownerUserId)))
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const current = await findContact(context.organization.id, id);
     if (!current)
       return NextResponse.json(
-        { message: "コンタクトが見つかりません。" },
+        { message: "担当者が見つかりません。" },
         { status: 404 },
       );
     if (!(await canViewRecord(context, current.ownerUserId)))
@@ -122,7 +122,7 @@ export async function DELETE(_: Request, { params }: Params) {
     const item = await findContact(context.organization.id, id);
     if (!item)
       return NextResponse.json(
-        { message: "コンタクトが見つかりません。" },
+        { message: "担当者が見つかりません。" },
         { status: 404 },
       );
     await prisma.contact.update({

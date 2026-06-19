@@ -23,7 +23,7 @@ export default async function CustomPropertiesPage() {
       <PageHeading
         eyebrow="Property settings"
         title="カスタム項目"
-        description="コンタクト・会社・商談に、自社の営業プロセスに必要な入力項目を追加します。"
+        description="担当者・会社・商談に、自社の営業プロセスに必要な入力項目を追加します。"
       />
       <SettingsNav />
       <CustomPropertyManager

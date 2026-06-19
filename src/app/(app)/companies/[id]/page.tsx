@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ObjectType } from "@prisma/client";
+import { ContactPersonManager } from "@/components/crm/contact-person-manager";
 import { notFound, redirect } from "next/navigation";
 import { RecordDetail } from "@/components/crm/record-detail";
 import { PageHeading } from "@/components/ui/page-heading";
@@ -21,16 +23,70 @@ export default async function CompanyDetailPage({
     include: { owner: { select: { name: true } } },
   });
   if (!item) notFound();
-  const [activities, related, options, customFields] = await Promise.all([
-    getRecordActivities(context.organization.id, "COMPANY", id),
-    getRelatedRecords(context.organization.id, "COMPANY", id),
-    getAssociationOptions(context.organization.id),
-    getCustomFieldDetails(
-      context.organization.id,
-      "COMPANY",
-      item.customFields,
-    ),
-  ]);
+  const [activities, related, options, customFields, contactLinks] =
+    await Promise.all([
+      getRecordActivities(context.organization.id, "COMPANY", id),
+      getRelatedRecords(context.organization.id, "COMPANY", id),
+      getAssociationOptions(context.organization.id),
+      getCustomFieldDetails(
+        context.organization.id,
+        "COMPANY",
+        item.customFields,
+      ),
+      prisma.objectAssociation.findMany({
+        where: {
+          organizationId: context.organization.id,
+          OR: [
+            {
+              sourceObjectType: "CONTACT",
+              targetObjectType: "COMPANY",
+              targetObjectId: id,
+            },
+            {
+              sourceObjectType: "COMPANY",
+              sourceObjectId: id,
+              targetObjectType: "CONTACT",
+            },
+          ],
+        },
+        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+      }),
+    ]);
+  const contactIds = contactLinks.map((link) =>
+    link.sourceObjectType === ObjectType.CONTACT
+      ? link.sourceObjectId
+      : link.targetObjectId,
+  );
+  const contacts = await prisma.contact.findMany({
+    where: {
+      organizationId: context.organization.id,
+      id: { in: contactIds },
+      deletedAt: null,
+    },
+  });
+  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
+  const contactPeople = contactLinks
+    .map((link) => {
+      const contactId =
+        link.sourceObjectType === ObjectType.CONTACT
+          ? link.sourceObjectId
+          : link.targetObjectId;
+      const contact = contactById.get(contactId);
+      if (!contact) return null;
+      return {
+        associationId: link.id,
+        id: contact.id,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        email: contact.email,
+        phone: contact.phone,
+        mobilePhone: contact.mobilePhone,
+        jobTitle: contact.jobTitle,
+        label: link.label,
+        isPrimary: link.isPrimary,
+      };
+    })
+    .filter((contact) => contact !== null);
   const canEdit =
     hasPermission(context.membership.role, Permission.CRM_WRITE) &&
     (context.membership.role !== "USER" ||
@@ -93,6 +149,13 @@ export default async function CompanyDetailPage({
           Permission.CRM_DELETE,
         )}
       />
+      <div className="mt-6">
+        <ContactPersonManager
+          companyId={id}
+          contacts={contactPeople}
+          canEdit={canEdit}
+        />
+      </div>
     </div>
   );
 }

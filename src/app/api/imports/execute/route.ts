@@ -256,6 +256,25 @@ export async function POST(request: Request) {
                     organizationId: context.organization.id,
                   },
                 });
+            const importedContact = await upsertImportedContactForCompany(tx, {
+              organizationId: context.organization.id,
+              ownerUserId,
+              contactName: row.contactName,
+              contactEmail: row.contactEmail,
+              contactPhone: row.contactPhone,
+              contactJobTitle: row.contactJobTitle,
+            });
+            if (importedContact) {
+              await setPrimaryAssociation(tx, {
+                organizationId: context.organization.id,
+                sourceObjectType: "CONTACT",
+                sourceObjectId: importedContact.id,
+                targetObjectType: "COMPANY",
+                targetObjectId: item.id,
+                label: row.contactLabel || null,
+                isPrimary: parseBoolean(row.contactIsPrimary),
+              });
+            }
             await createRecordActivity(tx, {
               organizationId: context.organization.id,
               actorUserId: context.user.id,
@@ -540,6 +559,81 @@ async function findOrCreateCompanyForImport(
   });
 }
 
+async function upsertImportedContactForCompany(
+  tx: ImportTx,
+  input: {
+    organizationId: string;
+    ownerUserId: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    contactJobTitle?: string;
+  },
+) {
+  if (
+    !input.contactName &&
+    !input.contactEmail &&
+    !input.contactPhone &&
+    !input.contactJobTitle
+  )
+    return null;
+  const email = input.contactEmail ? normalizeEmail(input.contactEmail) : null;
+  const existing = email
+    ? await tx.contact.findUnique({
+        where: {
+          organizationId_email: {
+            organizationId: input.organizationId,
+            email,
+          },
+        },
+      })
+    : null;
+  const { lastName, firstName } = splitPersonName(input.contactName);
+  return existing
+    ? tx.contact.update({
+        where: { id: existing.id },
+        data: {
+          ownerUserId: input.ownerUserId,
+          firstName: firstName || existing.firstName,
+          lastName: lastName || existing.lastName,
+          phone: input.contactPhone || existing.phone,
+          jobTitle: input.contactJobTitle || existing.jobTitle,
+          deletedAt: null,
+        },
+      })
+    : tx.contact.create({
+        data: {
+          organizationId: input.organizationId,
+          ownerUserId: input.ownerUserId,
+          firstName,
+          lastName,
+          email,
+          phone: input.contactPhone || null,
+          jobTitle: input.contactJobTitle || null,
+        },
+      });
+}
+
+function splitPersonName(name?: string) {
+  const normalized = name?.trim();
+  if (!normalized) return { lastName: null, firstName: null };
+  const [lastName, ...rest] = normalized.split(/\s+/);
+  return { lastName, firstName: rest.join(" ") || null };
+}
+
+function parseBoolean(value?: string) {
+  return [
+    "1",
+    "true",
+    "TRUE",
+    "yes",
+    "on",
+    "主",
+    "主担当",
+    "主担当者",
+  ].includes(value ?? "");
+}
+
 async function findOrCreateContactForImport(
   tx: ImportTx,
   input: {
@@ -584,19 +678,23 @@ async function setPrimaryAssociation(
     sourceObjectId: string;
     targetObjectType: "CONTACT" | "COMPANY" | "DEAL";
     targetObjectId: string;
+    label?: string | null;
+    isPrimary?: boolean;
   },
 ) {
-  await tx.objectAssociation.updateMany({
-    where: {
-      organizationId: input.organizationId,
-      sourceObjectType: input.sourceObjectType,
-      sourceObjectId: input.sourceObjectId,
-      targetObjectType: input.targetObjectType,
-      isPrimary: true,
-      NOT: { targetObjectId: input.targetObjectId },
-    },
-    data: { isPrimary: false },
-  });
+  if (input.isPrimary ?? true) {
+    await tx.objectAssociation.updateMany({
+      where: {
+        organizationId: input.organizationId,
+        sourceObjectType: input.sourceObjectType,
+        sourceObjectId: input.sourceObjectId,
+        targetObjectType: input.targetObjectType,
+        isPrimary: true,
+        NOT: { targetObjectId: input.targetObjectId },
+      },
+      data: { isPrimary: false },
+    });
+  }
 
   await tx.objectAssociation.upsert({
     where: {
@@ -609,14 +707,15 @@ async function setPrimaryAssociation(
           targetObjectId: input.targetObjectId,
         },
     },
-    update: { isPrimary: true },
+    update: { label: input.label, isPrimary: input.isPrimary ?? true },
     create: {
       organizationId: input.organizationId,
       sourceObjectType: input.sourceObjectType,
       sourceObjectId: input.sourceObjectId,
       targetObjectType: input.targetObjectType,
       targetObjectId: input.targetObjectId,
-      isPrimary: true,
+      label: input.label,
+      isPrimary: input.isPrimary ?? true,
     },
   });
 }

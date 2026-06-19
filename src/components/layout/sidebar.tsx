@@ -7,10 +7,17 @@ import { Icon } from "@/components/ui/icon";
 const navigation = [
   { href: "/dashboard", label: "ダッシュボード", icon: "dashboard" },
   {
-    href: "/contacts",
-    label: "顧客",
+    href: "/companies",
+    label: "会社",
     icon: "contacts",
-    activePrefixes: ["/contacts", "/companies", "/deals"],
+    activePrefixes: ["/companies"],
+  },
+  { href: "/deals", label: "商談", icon: "deals" },
+  {
+    href: "/deals/board",
+    label: "パイプライン",
+    icon: "deals",
+    activePrefixes: ["/deals/board"],
   },
   { href: "/tasks", label: "タスク", icon: "tasks" },
   { href: "/imports", label: "インポート", icon: "import" },
@@ -35,10 +42,12 @@ export function Sidebar() {
         {navigation.map((item) => {
           const prefixes =
             "activePrefixes" in item ? item.activePrefixes : [item.href];
-          const active = prefixes.some(
-            (prefix) =>
-              pathname === prefix || pathname.startsWith(`${prefix}/`),
-          );
+          const active =
+            prefixes.some(
+              (prefix) =>
+                pathname === prefix || pathname.startsWith(`${prefix}/`),
+            ) &&
+            !(item.href === "/deals" && pathname.startsWith("/deals/board"));
           return (
             <Link
               key={item.href}

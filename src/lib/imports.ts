@@ -30,6 +30,12 @@ export const importFields: Record<ImportObjectType, ImportField[]> = {
     { value: "employeeCount", label: "従業員数" },
     { value: "annualRevenue", label: "年間売上" },
     { value: "ownerEmail", label: "担当者メール" },
+    { value: "contactName", label: "担当者氏名" },
+    { value: "contactEmail", label: "担当者メール" },
+    { value: "contactPhone", label: "担当者電話番号" },
+    { value: "contactJobTitle", label: "担当者役職" },
+    { value: "contactLabel", label: "担当者区分" },
+    { value: "contactIsPrimary", label: "主担当者フラグ" },
   ],
   DEAL: [
     { value: "name", label: "商談名", required: true },
@@ -44,7 +50,7 @@ export const importFields: Record<ImportObjectType, ImportField[]> = {
     { value: "ownerEmail", label: "担当者メール" },
     { value: "companyName", label: "会社名" },
     { value: "companyDomain", label: "会社ドメイン" },
-    { value: "contactEmail", label: "コンタクトメール" },
+    { value: "contactEmail", label: "担当者メール" },
   ],
 };
 

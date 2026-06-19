@@ -24,7 +24,7 @@ export default async function FormsPage() {
       <PageHeading
         eyebrow="Lead capture"
         title="フォーム"
-        description={`${businessUnitSelection.selectedBusinessUnitName}の公開フォームからコンタクトを自動作成し、送信内容をタイムラインへ記録します。`}
+        description={`${businessUnitSelection.selectedBusinessUnitName}の公開フォームから担当者情報を登録し、送信内容をタイムラインへ記録します。`}
       />
       <FormManager
         forms={forms}

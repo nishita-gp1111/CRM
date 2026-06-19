@@ -8,7 +8,7 @@ import {
 import { prisma } from "./prisma";
 
 export const crmObjectLabels: Record<"CONTACT" | "COMPANY" | "DEAL", string> = {
-  CONTACT: "コンタクト",
+  CONTACT: "担当者",
   COMPANY: "会社",
   DEAL: "商談",
 };
