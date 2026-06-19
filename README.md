@@ -2,7 +2,7 @@
 
 営業代行会社・Web制作会社・広告代理店向けの営業CRMです。HubSpotのCRM思想を参考にしつつ、UI・名称・文言は独自に設計しています。
 
-現在は既存CRM機能に加えて、営業オペレーション管理CRMへ拡張するための **事業部基盤 Phase 1** まで実装済みです。認証・CRMコア、インポート、公開フォーム、日程調整、メールログ、Web問い合わせ受付、事業部切り替えを利用できます。
+現在は既存CRM機能に加えて、営業オペレーション管理CRMへ拡張するための **Phase 2 KPI基盤** まで実装済みです。認証・CRMコア、インポート、公開フォーム、日程調整、メールログ、Web問い合わせ受付、事業部切り替え、KPIレポート、日次実績、商品/価格、目標、進捗管理Excel dry runを利用できます。
 
 ## 技術構成
 
@@ -34,6 +34,7 @@ cp .env.example .env
 | `SESSION_COOKIE_NAME` | 認証Cookie名             |
 | `SESSION_TTL_DAYS`    | セッション有効日数       |
 | `APP_URL`             | 招待URL生成に使う公開URL |
+| `LEGACY_PROGRESS_IMPORT_MAX_BYTES` | 進捗管理Excelの推奨上限 |
 
 ### 3. PostgreSQL
 
@@ -199,6 +200,35 @@ npm run build
 - 宛先・件名・本文・送信日時を保持する手動メールログ
 - 組織slugごとの公開問い合わせページとiframe埋め込みコード
 - 問い合わせの会話一覧、担当者情報作成・更新、チャット活動記録
+
+## Phase 2 KPI基盤の実装範囲
+
+- Product / BusinessUnitProduct / PriceBookEntry
+- DealLineItemによる商談と商品明細の分離
+- ForecastCategoryによるヨミ・見込粗利・加重見込粗利
+- DealParticipantによるIS / FS / 紹介 / 飛込の帰属固定
+- SalesPerformanceEventによる実績イベント
+- Referral / FieldVisit
+- MetricDefinition / MetricDefinitionVersion / MetricValidationRule
+- DailyMetricEntryによる日次実績入力
+- KpiTargetによる月次目標
+- BusinessCalendar / BusinessCalendarException
+- ActionPlan
+- LegacySourceLink
+- `/reports`: KPIスコアカード
+- `/daily-metrics`: 日次実績入力
+- `/imports/legacy-progress`: 進捗管理Excel dry run
+- `/settings/kpis`, `/settings/products`, `/settings/targets`
+
+詳細:
+
+- `docs/phase2-kpi-architecture.md`
+- `docs/phase2-er-diagram.md`
+- `docs/kpi-catalog.md`
+- `docs/kpi-attribution-rules.md`
+- `docs/excel-migration-map.md`
+- `docs/excel-import-runbook.md`
+- `docs/business-calendar.md`
 
 ## Prismaスキーマ
 

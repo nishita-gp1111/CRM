@@ -8,6 +8,12 @@ export type ParsedSpreadsheet = {
   sheetName?: string;
 };
 
+export type ParsedWorkbookSheet = {
+  sheetName: string;
+  rows: string[][];
+  rowNumbers: number[];
+};
+
 type ZipEntry = {
   name: string;
   compressionMethod: number;
@@ -59,6 +65,30 @@ export function parseXlsx(buffer: Buffer): ParsedSpreadsheet {
     ...parseWorksheet(sheetXml, sharedStrings, dateStyles),
     sheetName: sheet.name,
   };
+}
+
+export function parseXlsxWorkbook(buffer: Buffer): ParsedWorkbookSheet[] {
+  const files = readZipFiles(buffer);
+  const workbookXml = getRequiredText(files, "xl/workbook.xml");
+  const relationshipsXml = getRequiredText(files, "xl/_rels/workbook.xml.rels");
+  const relationships = parseRelationships(relationshipsXml);
+  const sheets = parseWorkbookSheets(workbookXml);
+  const sharedStrings = parseSharedStrings(files.get("xl/sharedStrings.xml"));
+  const dateStyles = parseDateStyles(files.get("xl/styles.xml"));
+
+  return sheets.flatMap((sheet) => {
+    const target = relationships.get(sheet.relationshipId);
+    if (!target) return [];
+    const sheetPath = resolvePath("xl", target);
+    const sheetXml = files.get(sheetPath);
+    if (!sheetXml) return [];
+    return [
+      {
+        sheetName: sheet.name,
+        ...parseWorksheetMatrix(sheetXml, sharedStrings, dateStyles),
+      },
+    ];
+  });
 }
 
 function readZipFiles(buffer: Buffer) {
@@ -258,6 +288,49 @@ function parseWorksheet(
     headers,
     rows: parsedRows.slice(0, MAX_ROWS),
     truncated: parsedRows.length > MAX_ROWS,
+  };
+}
+
+function parseWorksheetMatrix(
+  xml: string,
+  sharedStrings: string[],
+  dateStyles: DateStyle[],
+): Omit<ParsedWorkbookSheet, "sheetName"> {
+  const parsedRows: Array<{ rowNumber: number; cells: Map<number, string> }> =
+    [];
+  let maxColumn = 0;
+
+  for (const rowMatch of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/g)) {
+    const rowAttrs = parseAttributes(rowMatch[1]);
+    const rowNumber = Number(rowAttrs.r) || parsedRows.length + 1;
+    const cells = new Map<number, string>();
+    let fallbackColumn = 0;
+
+    for (const cellMatch of rowMatch[2].matchAll(
+      /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
+    )) {
+      const attrs = parseAttributes(cellMatch[1]);
+      const columnIndex = attrs.r
+        ? columnIndexFromRef(attrs.r)
+        : fallbackColumn;
+      fallbackColumn = columnIndex + 1;
+      cells.set(
+        columnIndex,
+        readCellValue(attrs, cellMatch[2] ?? "", sharedStrings, dateStyles),
+      );
+      maxColumn = Math.max(maxColumn, columnIndex + 1);
+    }
+
+    parsedRows.push({ rowNumber, cells });
+  }
+
+  return {
+    rowNumbers: parsedRows.map((row) => row.rowNumber),
+    rows: parsedRows.map((row) =>
+      Array.from({ length: maxColumn }, (_, index) =>
+        (row.cells.get(index) ?? "").trim(),
+      ),
+    ),
   };
 }
 

@@ -49,11 +49,262 @@ enum StageType {
 }
 
 enum DealStatus {
-  OPEN @map("open")
-  WON  @map("won")
-  LOST @map("lost")
+  OPEN      @map("open")
+  WON       @map("won")
+  LOST      @map("lost")
+  CANCELLED @map("cancelled")
+  INVALID   @map("invalid")
+  NURTURE   @map("nurture")
 
   @@map("deal_status")
+}
+
+enum ProductStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+  ARCHIVED @map("archived")
+
+  @@map("product_status")
+}
+
+enum PriceBookStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("price_book_status")
+}
+
+enum DealLineItemStatus {
+  PROPOSED  @map("proposed")
+  WON       @map("won")
+  LOST      @map("lost")
+  CANCELLED @map("cancelled")
+
+  @@map("deal_line_item_status")
+}
+
+enum ForecastCategoryStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("forecast_category_status")
+}
+
+enum DecisionMakerStatus {
+  DECISION_MAKER     @map("decision_maker")
+  NON_DECISION_MAKER @map("non_decision_maker")
+  UNKNOWN            @map("unknown")
+
+  @@map("decision_maker_status")
+}
+
+enum QualificationResult {
+  VALID        @map("valid")
+  INVALID      @map("invalid")
+  CONDITION_NG @map("condition_ng")
+  UNDETERMINED @map("undetermined")
+
+  @@map("qualification_result")
+}
+
+enum DealParticipantRole {
+  OWNER              @map("owner")
+  APPOINTMENT_SETTER @map("appointment_setter")
+  CLOSER             @map("closer")
+  REFERRER           @map("referrer")
+  WALK_IN_OWNER      @map("walk_in_owner")
+  SUPPORT            @map("support")
+
+  @@map("deal_participant_role")
+}
+
+enum DealParticipantStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("deal_participant_status")
+}
+
+enum MeetingBookingStatus {
+  SCHEDULED   @map("scheduled")
+  ATTENDED    @map("attended")
+  NO_SHOW     @map("no_show")
+  CANCELLED   @map("cancelled")
+  RESCHEDULED @map("rescheduled")
+  INVALID     @map("invalid")
+
+  @@map("meeting_booking_status")
+}
+
+enum SalesPerformanceEventType {
+  CALL                         @map("call")
+  CONNECTION                   @map("connection")
+  OWNER_CONTACT                @map("owner_contact")
+  FULL                         @map("full")
+  SHORT                        @map("short")
+  CONDITION_NG                 @map("condition_ng")
+  APPOINTMENT_SET              @map("appointment_set")
+  VALID_MEETING                @map("valid_meeting")
+  INVALID_MEETING              @map("invalid_meeting")
+  MEETING_ATTENDED             @map("meeting_attended")
+  DEAL_WON                     @map("deal_won")
+  DEAL_LOST                    @map("deal_lost")
+  REVENUE_RECOGNIZED           @map("revenue_recognized")
+  GROSS_PROFIT_RECOGNIZED      @map("gross_profit_recognized")
+  REFERRAL_CREATED             @map("referral_created")
+  REFERRAL_APPOINTMENT_SET     @map("referral_appointment_set")
+  REFERRAL_MEETING_ATTENDED    @map("referral_meeting_attended")
+  REFERRAL_WON                 @map("referral_won")
+  FIELD_VISIT                  @map("field_visit")
+  FIELD_VISIT_CONNECTION       @map("field_visit_connection")
+  FIELD_VISIT_OWNER_CONNECTION @map("field_visit_owner_connection")
+  FIELD_VISIT_MEETING          @map("field_visit_meeting")
+  FIELD_VISIT_APPOINTMENT_SET  @map("field_visit_appointment_set")
+  FIELD_VISIT_WON              @map("field_visit_won")
+  FIELD_VISIT_SAME_DAY_WON     @map("field_visit_same_day_won")
+  DOMAIN_ATTACHMENT            @map("domain_attachment")
+
+  @@map("sales_performance_event_type")
+}
+
+enum SalesPerformanceEventSource {
+  MANUAL   @map("manual")
+  SYSTEM   @map("system")
+  IMPORT   @map("import")
+  BACKFILL @map("backfill")
+
+  @@map("sales_performance_event_source")
+}
+
+enum ReferralStatus {
+  NEW              @map("new")
+  APPOINTMENT_SET  @map("appointment_set")
+  MEETING_ATTENDED @map("meeting_attended")
+  WON              @map("won")
+  LOST             @map("lost")
+  CANCELLED        @map("cancelled")
+
+  @@map("referral_status")
+}
+
+enum FieldVisitStatus {
+  PLANNED         @map("planned")
+  VISITED         @map("visited")
+  CONNECTED       @map("connected")
+  OWNER_CONNECTED @map("owner_connected")
+  MEETING_SET     @map("meeting_set")
+  APPOINTMENT_SET @map("appointment_set")
+  WON             @map("won")
+  LOST            @map("lost")
+  INVALID         @map("invalid")
+
+  @@map("field_visit_status")
+}
+
+enum MetricSourceType {
+  MANUAL_DAILY      @map("manual_daily")
+  PERFORMANCE_EVENT @map("performance_event")
+  APPOINTMENT       @map("appointment")
+  DEAL              @map("deal")
+  DEAL_LINE_ITEM    @map("deal_line_item")
+  REFERRAL          @map("referral")
+  FIELD_VISIT       @map("field_visit")
+  FORMULA           @map("formula")
+  DELIVERY_PROJECT  @map("delivery_project")
+
+  @@map("metric_source_type")
+}
+
+enum MetricCategory {
+  EXECUTIVE   @map("executive")
+  OUTCOME     @map("outcome")
+  PIPELINE    @map("pipeline")
+  ACTIVITY    @map("activity")
+  CONVERSION  @map("conversion")
+  QUALITY     @map("quality")
+  REFERRAL    @map("referral")
+  FIELD_VISIT @map("field_visit")
+  PRODUCT     @map("product")
+  FORECAST    @map("forecast")
+  ACTION_PLAN @map("action_plan")
+  CS          @map("cs")
+
+  @@map("metric_category")
+}
+
+enum MetricUnit {
+  COUNT    @map("count")
+  CURRENCY @map("currency")
+  PERCENT  @map("percent")
+  DAYS     @map("days")
+  NUMBER   @map("number")
+
+  @@map("metric_unit")
+}
+
+enum MetricAggregation {
+  COUNT          @map("count")
+  DISTINCT_COUNT @map("distinct_count")
+  SUM            @map("sum")
+  AVERAGE        @map("average")
+  RATE           @map("rate")
+
+  @@map("metric_aggregation")
+}
+
+enum MetricPeriodType {
+  DAILY     @map("daily")
+  WEEKLY    @map("weekly")
+  MONTHLY   @map("monthly")
+  QUARTERLY @map("quarterly")
+  YEARLY    @map("yearly")
+  CUSTOM    @map("custom")
+
+  @@map("metric_period_type")
+}
+
+enum DailyMetricStatus {
+  DRAFT     @map("draft")
+  SUBMITTED @map("submitted")
+  APPROVED  @map("approved")
+  LOCKED    @map("locked")
+
+  @@map("daily_metric_status")
+}
+
+enum DailyMetricSource {
+  MANUAL     @map("manual")
+  IMPORT     @map("import")
+  BACKFILL   @map("backfill")
+  ADJUSTMENT @map("adjustment")
+
+  @@map("daily_metric_source")
+}
+
+enum ValidationSeverity {
+  INFO    @map("info")
+  WARNING @map("warning")
+  ERROR   @map("error")
+
+  @@map("validation_severity")
+}
+
+enum ActionPlanStatus {
+  NOT_STARTED @map("not_started")
+  IN_PROGRESS @map("in_progress")
+  COMPLETED   @map("completed")
+  CANCELLED   @map("cancelled")
+
+  @@map("action_plan_status")
+}
+
+enum ActionPlanPriority {
+  LOW    @map("low")
+  MEDIUM @map("medium")
+  HIGH   @map("high")
+  URGENT @map("urgent")
+
+  @@map("action_plan_priority")
 }
 
 enum ActivityType {
@@ -177,31 +428,49 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  memberships             OrganizationMember[]
-  teams                   Team[]
-  invitations             Invitation[]
-  sessions                AuthSession[]
-  contacts                Contact[]
-  companies               Company[]
-  deals                   Deal[]
-  activities              Activity[]
-  tasks                   Task[]
-  pipelines               Pipeline[]
-  stages                  PipelineStage[]
-  associations            ObjectAssociation[]
-  customProperties        CustomProperty[]
-  importJobs              ImportJob[]
-  emailTemplates          EmailTemplate[]
-  availabilityRules       AvailabilityRule[]
-  meetingLinks            MeetingLink[]
-  meetingBookings         MeetingBooking[]
-  forms                   Form[]
-  formSubmissions         FormSubmission[]
-  conversations           Conversation[]
-  auditLogs               AuditLog[]
-  savedViews              SavedView[]
-  businessUnits           BusinessUnit[]
-  businessUnitMemberships BusinessUnitMembership[]
+  memberships                OrganizationMember[]
+  teams                      Team[]
+  invitations                Invitation[]
+  sessions                   AuthSession[]
+  contacts                   Contact[]
+  companies                  Company[]
+  deals                      Deal[]
+  activities                 Activity[]
+  tasks                      Task[]
+  pipelines                  Pipeline[]
+  stages                     PipelineStage[]
+  associations               ObjectAssociation[]
+  customProperties           CustomProperty[]
+  importJobs                 ImportJob[]
+  emailTemplates             EmailTemplate[]
+  availabilityRules          AvailabilityRule[]
+  meetingLinks               MeetingLink[]
+  meetingBookings            MeetingBooking[]
+  forms                      Form[]
+  formSubmissions            FormSubmission[]
+  conversations              Conversation[]
+  auditLogs                  AuditLog[]
+  savedViews                 SavedView[]
+  businessUnits              BusinessUnit[]
+  businessUnitMemberships    BusinessUnitMembership[]
+  products                   Product[]
+  businessUnitProducts       BusinessUnitProduct[]
+  priceBookEntries           PriceBookEntry[]
+  forecastCategories         ForecastCategory[]
+  dealLineItems              DealLineItem[]
+  dealParticipants           DealParticipant[]
+  salesPerformanceEvents     SalesPerformanceEvent[]
+  referrals                  Referral[]
+  fieldVisits                FieldVisit[]
+  metricDefinitions          MetricDefinition[]
+  metricDefinitionVersions   MetricDefinitionVersion[]
+  dailyMetricEntries         DailyMetricEntry[]
+  metricValidationRules      MetricValidationRule[]
+  kpiTargets                 KpiTarget[]
+  businessCalendars          BusinessCalendar[]
+  businessCalendarExceptions BusinessCalendarException[]
+  actionPlans                ActionPlan[]
+  legacySourceLinks          LegacySourceLink[]
 }
 
 model OrganizationMember {
@@ -238,12 +507,15 @@ model BusinessUnit {
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships       BusinessUnitMembership[]
-  selectedByMembers OrganizationMember[]     @relation("SelectedBusinessUnit")
-  pipelines         Pipeline[]
-  deals             Deal[]
-  forms             Form[]
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships        BusinessUnitMembership[]
+  selectedByMembers  OrganizationMember[]     @relation("SelectedBusinessUnit")
+  pipelines          Pipeline[]
+  deals              Deal[]
+  forms              Form[]
+  products           BusinessUnitProduct[]
+  forecastCategories ForecastCategory[]
+  businessCalendars  BusinessCalendar[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, name])
@@ -422,34 +694,46 @@ model PipelineStage {
 }
 
 model Deal {
-  id                String     @id @default(uuid()) @db.Uuid
-  organizationId    String     @map("organization_id") @db.Uuid
-  businessUnitId    String?    @map("business_unit_id") @db.Uuid
-  ownerUserId       String?    @map("owner_user_id") @db.Uuid
-  pipelineId        String     @map("pipeline_id") @db.Uuid
-  stageId           String     @map("stage_id") @db.Uuid
-  name              String     @db.VarChar(200)
-  amount            Decimal?   @db.Decimal(18, 2)
-  expectedCloseDate DateTime?  @map("expected_close_date") @db.Date
-  closeDate         DateTime?  @map("close_date") @db.Date
-  probability       Int        @default(0)
-  status            DealStatus @default(OPEN)
-  lostReason        String?    @map("lost_reason")
-  source            String?    @db.VarChar(120)
-  externalId        String?    @map("external_id") @db.VarChar(160)
-  customFields      Json       @default("{}") @map("custom_fields") @db.JsonB
-  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt         DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  id                  String              @id @default(uuid()) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  businessUnitId      String?             @map("business_unit_id") @db.Uuid
+  ownerUserId         String?             @map("owner_user_id") @db.Uuid
+  pipelineId          String              @map("pipeline_id") @db.Uuid
+  stageId             String              @map("stage_id") @db.Uuid
+  forecastCategoryId  String?             @map("forecast_category_id") @db.Uuid
+  name                String              @db.VarChar(200)
+  amount              Decimal?            @db.Decimal(18, 2)
+  expectedCloseDate   DateTime?           @map("expected_close_date") @db.Date
+  closeDate           DateTime?           @map("close_date") @db.Date
+  probability         Int                 @default(0)
+  status              DealStatus          @default(OPEN)
+  decisionMakerStatus DecisionMakerStatus @default(UNKNOWN) @map("decision_maker_status")
+  qualificationResult QualificationResult @default(UNDETERMINED) @map("qualification_result")
+  lostReason          String?             @map("lost_reason")
+  source              String?             @db.VarChar(120)
+  externalId          String?             @map("external_id") @db.VarChar(160)
+  legacyProgress      String?             @map("legacy_progress") @db.VarChar(160)
+  wonAt               DateTime?           @map("won_at") @db.Timestamptz(3)
+  lostAt              DateTime?           @map("lost_at") @db.Timestamptz(3)
+  cancelledAt         DateTime?           @map("cancelled_at") @db.Timestamptz(3)
+  invalidatedAt       DateTime?           @map("invalidated_at") @db.Timestamptz(3)
+  customFields        Json                @default("{}") @map("custom_fields") @db.JsonB
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?           @map("deleted_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id], onDelete: SetNull)
-  owner        User?         @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  pipeline     Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
-  stage        PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit?     @relation(fields: [businessUnitId], references: [id], onDelete: SetNull)
+  owner        User?             @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  pipeline     Pipeline          @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
+  stage        PipelineStage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  lineItems    DealLineItem[]
+  participants DealParticipant[]
 
   @@unique([organizationId, externalId])
   @@index([organizationId, businessUnitId, pipelineId, stageId, deletedAt])
+  @@index([organizationId, businessUnitId, status, closeDate])
+  @@index([organizationId, forecastCategoryId])
   @@index([organizationId, ownerUserId])
   @@map("deals")
 }
@@ -635,15 +919,28 @@ model MeetingLink {
 }
 
 model MeetingBooking {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  meetingLinkId  String   @map("meeting_link_id") @db.Uuid
-  contactId      String?  @map("contact_id") @db.Uuid
-  guestName      String   @map("guest_name") @db.VarChar(120)
-  guestEmail     String   @map("guest_email") @db.VarChar(320)
-  startsAt       DateTime @map("starts_at") @db.Timestamptz(3)
-  endsAt         DateTime @map("ends_at") @db.Timestamptz(3)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                  String               @id @default(uuid()) @db.Uuid
+  organizationId      String               @map("organization_id") @db.Uuid
+  meetingLinkId       String               @map("meeting_link_id") @db.Uuid
+  contactId           String?              @map("contact_id") @db.Uuid
+  businessUnitId      String?              @map("business_unit_id") @db.Uuid
+  dealId              String?              @map("deal_id") @db.Uuid
+  setByUserId         String?              @map("set_by_user_id") @db.Uuid
+  hostUserId          String?              @map("host_user_id") @db.Uuid
+  guestName           String               @map("guest_name") @db.VarChar(120)
+  guestEmail          String               @map("guest_email") @db.VarChar(320)
+  startsAt            DateTime             @map("starts_at") @db.Timestamptz(3)
+  endsAt              DateTime             @map("ends_at") @db.Timestamptz(3)
+  status              MeetingBookingStatus @default(SCHEDULED)
+  qualificationResult QualificationResult  @default(UNDETERMINED) @map("qualification_result")
+  appointmentSetAt    DateTime?            @map("appointment_set_at") @db.Timestamptz(3)
+  attendedAt          DateTime?            @map("attended_at") @db.Timestamptz(3)
+  cancelledAt         DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  noShowAt            DateTime?            @map("no_show_at") @db.Timestamptz(3)
+  sourceChannel       String?              @map("source_channel") @db.VarChar(120)
+  meetingType         String?              @map("meeting_type") @db.VarChar(120)
+  legacyMetadata      Json                 @default("{}") @map("legacy_metadata") @db.JsonB
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meetingLink  MeetingLink  @relation(fields: [meetingLinkId], references: [id], onDelete: Cascade)
@@ -651,6 +948,9 @@ model MeetingBooking {
 
   @@unique([meetingLinkId, startsAt])
   @@index([organizationId, startsAt])
+  @@index([organizationId, businessUnitId, startsAt])
+  @@index([organizationId, setByUserId, appointmentSetAt])
+  @@index([organizationId, dealId])
   @@map("meeting_bookings")
 }
 
@@ -726,4 +1026,475 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, targetType, targetId])
   @@map("audit_logs")
+}
+
+model Product {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  name           String        @db.VarChar(160)
+  normalizedName String        @map("normalized_name") @db.VarChar(160)
+  sku            String?       @db.VarChar(80)
+  description    String?
+  category       String?       @db.VarChar(120)
+  status         ProductStatus @default(ACTIVE)
+  metadata       Json          @default("{}") @db.JsonB
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnitProducts BusinessUnitProduct[]
+  priceBookEntries     PriceBookEntry[]
+  lineItems            DealLineItem[]
+
+  @@unique([organizationId, normalizedName])
+  @@index([organizationId, status, name])
+  @@map("products")
+}
+
+model BusinessUnitProduct {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  businessUnitId String        @map("business_unit_id") @db.Uuid
+  productId      String        @map("product_id") @db.Uuid
+  status         ProductStatus @default(ACTIVE)
+  displayOrder   Int           @default(0) @map("display_order")
+  metadata       Json          @default("{}") @db.JsonB
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, productId])
+  @@index([organizationId, businessUnitId, status, displayOrder])
+  @@map("business_unit_products")
+}
+
+model PriceBookEntry {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  productId         String          @map("product_id") @db.Uuid
+  businessUnitId    String?         @map("business_unit_id") @db.Uuid
+  name              String          @db.VarChar(160)
+  currency          String          @default("JPY") @db.VarChar(3)
+  unitPriceAmount   Decimal?        @map("unit_price_amount") @db.Decimal(18, 2)
+  revenueAmount     Decimal?        @map("revenue_amount") @db.Decimal(18, 2)
+  grossProfitAmount Decimal?        @map("gross_profit_amount") @db.Decimal(18, 2)
+  effectiveFrom     DateTime?       @map("effective_from") @db.Date
+  effectiveUntil    DateTime?       @map("effective_until") @db.Date
+  status            PriceBookStatus @default(ACTIVE)
+  metadata          Json            @default("{}") @db.JsonB
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lineItems    DealLineItem[]
+
+  @@index([organizationId, productId, status])
+  @@index([organizationId, businessUnitId, status])
+  @@map("price_book_entries")
+}
+
+model ForecastCategory {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  businessUnitId String?                @map("business_unit_id") @db.Uuid
+  key            String                 @db.VarChar(80)
+  name           String                 @db.VarChar(120)
+  probability    Int                    @default(0)
+  status         ForecastCategoryStatus @default(ACTIVE)
+  displayOrder   Int                    @default(0) @map("display_order")
+  isClosed       Boolean                @default(false) @map("is_closed")
+  isOmitted      Boolean                @default(false) @map("is_omitted")
+  legacyAliases  Json                   @default("[]") @map("legacy_aliases") @db.JsonB
+  metadata       Json                   @default("{}") @db.JsonB
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, key])
+  @@index([organizationId, businessUnitId, status, displayOrder])
+  @@map("forecast_categories")
+}
+
+model DealLineItem {
+  id                        String             @id @default(uuid()) @db.Uuid
+  organizationId            String             @map("organization_id") @db.Uuid
+  dealId                    String             @map("deal_id") @db.Uuid
+  productId                 String?            @map("product_id") @db.Uuid
+  priceBookEntryId          String?            @map("price_book_entry_id") @db.Uuid
+  businessUnitId            String?            @map("business_unit_id") @db.Uuid
+  name                      String             @db.VarChar(180)
+  quantity                  Decimal            @default(1) @db.Decimal(18, 4)
+  unitPriceAmount           Decimal?           @map("unit_price_amount") @db.Decimal(18, 2)
+  revenueAmount             Decimal?           @map("revenue_amount") @db.Decimal(18, 2)
+  grossProfitAmount         Decimal?           @map("gross_profit_amount") @db.Decimal(18, 2)
+  expectedGrossProfitAmount Decimal?           @map("expected_gross_profit_amount") @db.Decimal(18, 2)
+  billingStartedAt          DateTime?          @map("billing_started_at") @db.Date
+  status                    DealLineItemStatus @default(PROPOSED)
+  source                    String?            @db.VarChar(120)
+  metadata                  Json               @default("{}") @db.JsonB
+  createdAt                 DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal           Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  priceBookEntry PriceBookEntry? @relation(fields: [priceBookEntryId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, businessUnitId, status])
+  @@index([organizationId, dealId])
+  @@index([organizationId, productId])
+  @@index([organizationId, billingStartedAt])
+  @@map("deal_line_items")
+}
+
+model DealParticipant {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @map("organization_id") @db.Uuid
+  dealId             String                @map("deal_id") @db.Uuid
+  userId             String?               @map("user_id") @db.Uuid
+  workFunction       WorkFunction?         @map("work_function")
+  role               DealParticipantRole
+  status             DealParticipantStatus @default(ACTIVE)
+  contributionWeight Decimal               @default(1) @map("contribution_weight") @db.Decimal(5, 2)
+  creditedAt         DateTime?             @map("credited_at") @db.Timestamptz(3)
+  snapshotUserName   String?               @map("snapshot_user_name") @db.VarChar(120)
+  metadata           Json                  @default("{}") @db.JsonB
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, dealId, role])
+  @@index([organizationId, userId, role, creditedAt])
+  @@map("deal_participants")
+}
+
+model SalesPerformanceEvent {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  organizationId     String                      @map("organization_id") @db.Uuid
+  businessUnitId     String?                     @map("business_unit_id") @db.Uuid
+  dealId             String?                     @map("deal_id") @db.Uuid
+  dealLineItemId     String?                     @map("deal_line_item_id") @db.Uuid
+  meetingBookingId   String?                     @map("meeting_booking_id") @db.Uuid
+  referralId         String?                     @map("referral_id") @db.Uuid
+  fieldVisitId       String?                     @map("field_visit_id") @db.Uuid
+  metricDefinitionId String?                     @map("metric_definition_id") @db.Uuid
+  creditedUserId     String?                     @map("credited_user_id") @db.Uuid
+  creditedRole       DealParticipantRole?        @map("credited_role")
+  workFunction       WorkFunction?               @map("work_function")
+  eventType          SalesPerformanceEventType   @map("event_type")
+  source             SalesPerformanceEventSource @default(SYSTEM)
+  occurredAt         DateTime                    @map("occurred_at") @db.Timestamptz(3)
+  quantity           Decimal                     @default(1) @db.Decimal(18, 4)
+  amount             Decimal?                    @db.Decimal(18, 2)
+  idempotencyKey     String                      @map("idempotency_key") @db.VarChar(240)
+  metadata           Json                        @default("{}") @db.JsonB
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  cancelledAt        DateTime?                   @map("cancelled_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, businessUnitId, occurredAt])
+  @@index([organizationId, eventType, occurredAt])
+  @@index([organizationId, creditedUserId, occurredAt])
+  @@index([organizationId, dealId])
+  @@map("sales_performance_events")
+}
+
+model Referral {
+  id                  String         @id @default(uuid()) @db.Uuid
+  organizationId      String         @map("organization_id") @db.Uuid
+  businessUnitId      String?        @map("business_unit_id") @db.Uuid
+  dealId              String?        @map("deal_id") @db.Uuid
+  referrerUserId      String?        @map("referrer_user_id") @db.Uuid
+  ownerUserId         String?        @map("owner_user_id") @db.Uuid
+  referredCompanyName String         @map("referred_company_name") @db.VarChar(200)
+  referredContactName String?        @map("referred_contact_name") @db.VarChar(160)
+  referredEmail       String?        @map("referred_email") @db.VarChar(320)
+  referredPhone       String?        @map("referred_phone") @db.VarChar(40)
+  status              ReferralStatus @default(NEW)
+  referredAt          DateTime       @default(now()) @map("referred_at") @db.Timestamptz(3)
+  appointmentSetAt    DateTime?      @map("appointment_set_at") @db.Timestamptz(3)
+  meetingAttendedAt   DateTime?      @map("meeting_attended_at") @db.Timestamptz(3)
+  wonAt               DateTime?      @map("won_at") @db.Timestamptz(3)
+  metadata            Json           @default("{}") @db.JsonB
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, businessUnitId, referredAt])
+  @@index([organizationId, referrerUserId, referredAt])
+  @@index([organizationId, status])
+  @@map("referrals")
+}
+
+model FieldVisit {
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  businessUnitId   String?          @map("business_unit_id") @db.Uuid
+  ownerUserId      String?          @map("owner_user_id") @db.Uuid
+  dealId           String?          @map("deal_id") @db.Uuid
+  companyName      String           @map("company_name") @db.VarChar(200)
+  contactName      String?          @map("contact_name") @db.VarChar(160)
+  address          String?
+  status           FieldVisitStatus @default(VISITED)
+  visitedAt        DateTime         @map("visited_at") @db.Timestamptz(3)
+  connectedAt      DateTime?        @map("connected_at") @db.Timestamptz(3)
+  ownerConnectedAt DateTime?        @map("owner_connected_at") @db.Timestamptz(3)
+  meetingSetAt     DateTime?        @map("meeting_set_at") @db.Timestamptz(3)
+  appointmentSetAt DateTime?        @map("appointment_set_at") @db.Timestamptz(3)
+  wonAt            DateTime?        @map("won_at") @db.Timestamptz(3)
+  sameDayWon       Boolean          @default(false) @map("same_day_won")
+  metadata         Json             @default("{}") @db.JsonB
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, businessUnitId, visitedAt])
+  @@index([organizationId, ownerUserId, visitedAt])
+  @@index([organizationId, status])
+  @@map("field_visits")
+}
+
+model MetricDefinition {
+  id                  String               @id @default(uuid()) @db.Uuid
+  organizationId      String               @map("organization_id") @db.Uuid
+  businessUnitId      String?              @map("business_unit_id") @db.Uuid
+  key                 String               @db.VarChar(120)
+  displayName         String               @map("display_name") @db.VarChar(160)
+  description         String?
+  category            MetricCategory       @default(ACTIVITY)
+  unit                MetricUnit           @default(COUNT)
+  sourceType          MetricSourceType     @map("source_type")
+  aggregation         MetricAggregation    @default(SUM)
+  workFunction        WorkFunction?        @map("work_function")
+  objectType          String?              @map("object_type") @db.VarChar(80)
+  dateField           String?              @map("date_field") @db.VarChar(80)
+  attributionRole     DealParticipantRole? @map("attribution_role")
+  numeratorMetricId   String?              @map("numerator_metric_id") @db.Uuid
+  denominatorMetricId String?              @map("denominator_metric_id") @db.Uuid
+  isActive            Boolean              @default(true) @map("is_active")
+  isPrimary           Boolean              @default(false) @map("is_primary")
+  isVisibleByDefault  Boolean              @default(true) @map("is_visible_by_default")
+  displayOrder        Int                  @default(0) @map("display_order")
+  minSampleSize       Int                  @default(0) @map("min_sample_size")
+  queryDefinition     Json                 @default("{}") @map("query_definition") @db.JsonB
+  filterDefinition    Json                 @default("{}") @map("filter_definition") @db.JsonB
+  metadata            Json                 @default("{}") @db.JsonB
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  versions     MetricDefinitionVersion[]
+  dailyEntries DailyMetricEntry[]
+  rules        MetricValidationRule[]
+  targets      KpiTarget[]
+  actionPlans  ActionPlan[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId, businessUnitId, workFunction, isActive])
+  @@index([organizationId, sourceType, aggregation])
+  @@map("metric_definitions")
+}
+
+model MetricDefinitionVersion {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  metricDefinitionId String            @map("metric_definition_id") @db.Uuid
+  version            Int
+  displayName        String            @map("display_name") @db.VarChar(160)
+  description        String?
+  sourceType         MetricSourceType  @map("source_type")
+  aggregation        MetricAggregation
+  unit               MetricUnit
+  queryDefinition    Json              @default("{}") @map("query_definition") @db.JsonB
+  filterDefinition   Json              @default("{}") @map("filter_definition") @db.JsonB
+  createdByUserId    String?           @map("created_by_user_id") @db.Uuid
+  isCurrent          Boolean           @default(true) @map("is_current")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([metricDefinitionId, version])
+  @@index([organizationId, metricDefinitionId, isCurrent])
+  @@map("metric_definition_versions")
+}
+
+model DailyMetricEntry {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  businessUnitId     String?           @map("business_unit_id") @db.Uuid
+  metricDefinitionId String            @map("metric_definition_id") @db.Uuid
+  userId             String            @map("user_id") @db.Uuid
+  workFunction       WorkFunction?     @map("work_function")
+  targetDate         DateTime          @map("target_date") @db.Date
+  value              Decimal           @db.Decimal(18, 4)
+  source             DailyMetricSource @default(MANUAL)
+  status             DailyMetricStatus @default(DRAFT)
+  submittedAt        DateTime?         @map("submitted_at") @db.Timestamptz(3)
+  approvedAt         DateTime?         @map("approved_at") @db.Timestamptz(3)
+  approvedByUserId   String?           @map("approved_by_user_id") @db.Uuid
+  lockedAt           DateTime?         @map("locked_at") @db.Timestamptz(3)
+  comment            String?
+  metadata           Json              @default("{}") @db.JsonB
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, businessUnitId, targetDate])
+  @@index([organizationId, metricDefinitionId, targetDate])
+  @@index([organizationId, userId, targetDate])
+  @@map("daily_metric_entries")
+}
+
+model MetricValidationRule {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizationId     String             @map("organization_id") @db.Uuid
+  metricDefinitionId String             @map("metric_definition_id") @db.Uuid
+  key                String             @db.VarChar(120)
+  name               String             @db.VarChar(160)
+  severity           ValidationSeverity @default(WARNING)
+  condition          Json               @default("{}") @db.JsonB
+  message            String
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([metricDefinitionId, key])
+  @@index([organizationId, isActive])
+  @@map("metric_validation_rules")
+}
+
+model KpiTarget {
+  id                 String           @id @default(uuid()) @db.Uuid
+  organizationId     String           @map("organization_id") @db.Uuid
+  metricDefinitionId String           @map("metric_definition_id") @db.Uuid
+  businessUnitId     String?          @map("business_unit_id") @db.Uuid
+  userId             String?          @map("user_id") @db.Uuid
+  teamId             String?          @map("team_id") @db.Uuid
+  workFunction       WorkFunction?    @map("work_function")
+  scopeKey           String           @map("scope_key") @db.VarChar(240)
+  periodType         MetricPeriodType @default(MONTHLY) @map("period_type")
+  periodStart        DateTime         @map("period_start") @db.Date
+  periodEnd          DateTime         @map("period_end") @db.Date
+  targetValue        Decimal          @map("target_value") @db.Decimal(18, 4)
+  metadata           Json             @default("{}") @db.JsonB
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+  actionPlans      ActionPlan[]
+
+  @@unique([organizationId, metricDefinitionId, scopeKey, periodStart, periodEnd])
+  @@index([organizationId, businessUnitId, periodStart, periodEnd])
+  @@index([organizationId, userId, periodStart, periodEnd])
+  @@map("kpi_targets")
+}
+
+model BusinessCalendar {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  businessUnitId     String?  @map("business_unit_id") @db.Uuid
+  name               String   @db.VarChar(160)
+  timezone           String   @default("Asia/Tokyo") @db.VarChar(80)
+  workWeekDefinition Json     @default("{}") @map("work_week_definition") @db.JsonB
+  defaultHolidays    Json     @default("[]") @map("default_holidays") @db.JsonB
+  isDefault          Boolean  @default(false) @map("is_default")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit?               @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  exceptions   BusinessCalendarException[]
+
+  @@unique([organizationId, businessUnitId, name])
+  @@index([organizationId, businessUnitId, isDefault])
+  @@map("business_calendars")
+}
+
+model BusinessCalendarException {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  calendarId     String   @map("calendar_id") @db.Uuid
+  targetDate     DateTime @map("target_date") @db.Date
+  isWorkingDay   Boolean  @map("is_working_day")
+  name           String?  @db.VarChar(160)
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  calendar     BusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, targetDate])
+  @@index([organizationId, targetDate])
+  @@map("business_calendar_exceptions")
+}
+
+model ActionPlan {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizationId     String             @map("organization_id") @db.Uuid
+  businessUnitId     String?            @map("business_unit_id") @db.Uuid
+  workFunction       WorkFunction?      @map("work_function")
+  ownerUserId        String?            @map("owner_user_id") @db.Uuid
+  targetId           String?            @map("target_id") @db.Uuid
+  metricDefinitionId String?            @map("metric_definition_id") @db.Uuid
+  title              String             @db.VarChar(200)
+  description        String?
+  dueDate            DateTime?          @map("due_date") @db.Date
+  status             ActionPlanStatus   @default(NOT_STARTED)
+  priority           ActionPlanPriority @default(MEDIUM)
+  completedAt        DateTime?          @map("completed_at") @db.Timestamptz(3)
+  createdByUserId    String?            @map("created_by_user_id") @db.Uuid
+  metadata           Json               @default("{}") @db.JsonB
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition? @relation(fields: [metricDefinitionId], references: [id], onDelete: SetNull)
+  target           KpiTarget?        @relation(fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, businessUnitId, status, dueDate])
+  @@index([organizationId, ownerUserId, status, dueDate])
+  @@index([organizationId, metricDefinitionId])
+  @@map("action_plans")
+}
+
+model LegacySourceLink {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  importJobId         String?  @map("import_job_id") @db.Uuid
+  provider            String   @db.VarChar(80)
+  workbookFingerprint String   @map("workbook_fingerprint") @db.VarChar(160)
+  sheetName           String   @map("sheet_name") @db.VarChar(160)
+  rowNumber           Int      @map("row_number")
+  rowFingerprint      String   @map("row_fingerprint") @db.VarChar(160)
+  targetObjectType    String   @map("target_object_type") @db.VarChar(80)
+  targetObjectId      String   @map("target_object_id") @db.VarChar(120)
+  importedAt          DateTime @default(now()) @map("imported_at") @db.Timestamptz(3)
+  metadata            Json     @default("{}") @db.JsonB
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider, workbookFingerprint, sheetName, rowNumber, rowFingerprint, targetObjectType])
+  @@index([organizationId, targetObjectType, targetObjectId])
+  @@index([organizationId, workbookFingerprint, sheetName])
+  @@map("legacy_source_links")
 }

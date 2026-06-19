@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 
 const navigation = [
   { href: "/dashboard", label: "ダッシュボード", icon: "dashboard" },
+  { href: "/reports", label: "レポート", icon: "reports" },
   {
     href: "/companies",
     label: "会社",

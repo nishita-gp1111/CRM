@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { ImportWizard } from "@/components/imports/import-wizard";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
@@ -49,6 +50,11 @@ export default async function ImportsPage() {
         eyebrow="Data import"
         title="データインポート"
         description="CSV、XLSX、貼り付けた表データをマッピングして一括作成・更新します。"
+        action={
+          <Link href="/imports/legacy-progress" className="secondary-button">
+            進捗管理Excel
+          </Link>
+        }
       />
       <ImportWizard fields={fields} />
     </div>

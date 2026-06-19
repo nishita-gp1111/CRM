@@ -12,6 +12,12 @@ const items = [
     activePrefixes: ["/dashboard"],
   },
   {
+    href: "/reports",
+    label: "レポート",
+    icon: "reports",
+    activePrefixes: ["/reports", "/daily-metrics"],
+  },
+  {
     href: "/companies",
     label: "会社",
     icon: "contacts",
@@ -22,12 +28,6 @@ const items = [
     label: "商談",
     icon: "deals",
     activePrefixes: ["/deals"],
-  },
-  {
-    href: "/tasks",
-    label: "タスク",
-    icon: "tasks",
-    activePrefixes: ["/tasks"],
   },
   {
     href: "/settings",

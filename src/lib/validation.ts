@@ -409,3 +409,140 @@ export const importExecuteSchema = z.object({
   mapping: z.record(z.string()),
   rows: z.array(z.record(z.string())).min(1).max(5000),
 });
+
+export const metricQuerySchema = z.object({
+  businessUnitId: optionalUuid,
+  workFunction: z.enum(["IS", "FS", "CS"]).nullable().optional(),
+  userId: optionalUuid,
+  periodStart: optionalDate,
+  periodEnd: optionalDate,
+});
+
+export const metricDefinitionSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_]*$/)
+    .max(120),
+  displayName: z.string().trim().min(1).max(160),
+  description: optionalText(2000),
+  businessUnitId: optionalUuid,
+  workFunction: z.enum(["IS", "FS", "CS"]).nullable().optional(),
+  category: z.enum([
+    "EXECUTIVE",
+    "OUTCOME",
+    "PIPELINE",
+    "ACTIVITY",
+    "CONVERSION",
+    "QUALITY",
+    "REFERRAL",
+    "FIELD_VISIT",
+    "PRODUCT",
+    "FORECAST",
+    "ACTION_PLAN",
+    "CS",
+  ]),
+  unit: z.enum(["COUNT", "CURRENCY", "PERCENT", "DAYS", "NUMBER"]),
+  sourceType: z.enum([
+    "MANUAL_DAILY",
+    "PERFORMANCE_EVENT",
+    "APPOINTMENT",
+    "DEAL",
+    "DEAL_LINE_ITEM",
+    "REFERRAL",
+    "FIELD_VISIT",
+    "FORMULA",
+    "DELIVERY_PROJECT",
+  ]),
+  aggregation: z.enum(["COUNT", "DISTINCT_COUNT", "SUM", "AVERAGE", "RATE"]),
+  dateField: optionalText(80),
+  queryDefinition: z.record(z.unknown()).default({}),
+  filterDefinition: z.record(z.unknown()).default({}),
+  isPrimary: z.boolean().default(false),
+  isVisibleByDefault: z.boolean().default(true),
+  displayOrder: z.coerce.number().int().min(0).default(0),
+  minSampleSize: z.coerce.number().int().min(0).default(0),
+});
+
+export const dailyMetricsPutSchema = z.object({
+  businessUnitId: z.string().uuid(),
+  workFunction: z.enum(["IS", "FS", "CS"]),
+  targetDate: z.coerce.date(),
+  userId: optionalUuid,
+  entries: z
+    .array(
+      z.object({
+        metricDefinitionId: z.string().uuid(),
+        value: z.coerce.number().min(0),
+        comment: optionalText(1000),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const dailyMetricsSubmitSchema = z.object({
+  businessUnitId: z.string().uuid(),
+  workFunction: z.enum(["IS", "FS", "CS"]),
+  targetDate: z.coerce.date(),
+});
+
+export const kpiTargetSchema = z.object({
+  metricDefinitionId: z.string().uuid(),
+  businessUnitId: optionalUuid,
+  userId: optionalUuid,
+  teamId: optionalUuid,
+  workFunction: z.enum(["IS", "FS", "CS"]).nullable().optional(),
+  periodType: z
+    .enum(["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY", "CUSTOM"])
+    .default("MONTHLY"),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  targetValue: z.coerce.number().min(0),
+});
+
+export const referralSchema = z.object({
+  businessUnitId: optionalUuid,
+  referrerUserId: optionalUuid,
+  ownerUserId: optionalUuid,
+  referredCompanyName: z.string().trim().min(1).max(200),
+  referredContactName: optionalText(160),
+  referredEmail: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+    z.string().trim().email().nullable().optional(),
+  ),
+  referredPhone: optionalText(40),
+  status: z
+    .enum(["NEW", "APPOINTMENT_SET", "MEETING_ATTENDED", "WON", "LOST", "CANCELLED"])
+    .default("NEW"),
+  referredAt: optionalDate,
+});
+
+export const fieldVisitSchema = z.object({
+  businessUnitId: optionalUuid,
+  ownerUserId: optionalUuid,
+  companyName: z.string().trim().min(1).max(200),
+  contactName: optionalText(160),
+  address: optionalText(500),
+  status: z
+    .enum([
+      "PLANNED",
+      "VISITED",
+      "CONNECTED",
+      "OWNER_CONNECTED",
+      "MEETING_SET",
+      "APPOINTMENT_SET",
+      "WON",
+      "LOST",
+      "INVALID",
+    ])
+    .default("VISITED"),
+  visitedAt: optionalDate,
+  sameDayWon: z.boolean().default(false),
+});
+
+export const legacyProgressApplySchema = z.object({
+  workbookFingerprint: z.string().min(32).max(128),
+  sourceName: z.string().trim().min(1).max(240),
+  dryRunSummary: z.record(z.unknown()).default({}),
+});
