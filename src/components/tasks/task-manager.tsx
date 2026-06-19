@@ -37,7 +37,7 @@ const priorityLabels: Record<string, string> = {
   LOW: "優先度 低",
 };
 const objectLabels: Record<ObjectType, string> = {
-  CONTACT: "連絡先",
+  CONTACT: "コンタクト",
   COMPANY: "会社",
   DEAL: "商談",
 };
@@ -431,7 +431,7 @@ function TaskForm({
               setRelatedType(event.target.value as ObjectType)
             }
           >
-            <option value="CONTACT">連絡先</option>
+            <option value="CONTACT">コンタクト</option>
             <option value="COMPANY">会社</option>
             <option value="DEAL">商談</option>
           </select>

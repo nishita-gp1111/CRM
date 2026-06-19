@@ -60,7 +60,7 @@ export default async function ConversationsPage() {
                 className="mt-4 inline-block text-sm font-bold text-brand-700"
                 href={`/contacts/${item.contact.id}`}
               >
-                連絡先を開く
+                コンタクトを開く
               </Link>
             ) : null}
           </article>

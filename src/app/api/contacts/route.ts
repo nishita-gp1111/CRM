@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           message:
-            "同じメールアドレスの連絡先が存在します。既存レコードを編集してください。",
+            "同じメールアドレスのコンタクトが存在します。既存レコードを編集してください。",
           id: existing.id,
         },
         { status: 409 },
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         objectType: "CONTACT",
         objectId: created.id,
         type: "SYSTEM_EVENT",
-        title: "連絡先を作成しました",
+        title: "コンタクトを作成しました",
       });
       return created;
     });

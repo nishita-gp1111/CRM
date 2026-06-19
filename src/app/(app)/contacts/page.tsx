@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { ObjectNav } from "@/components/crm/object-nav";
 import { Pagination } from "@/components/crm/pagination";
 import { RecordList } from "@/components/crm/record-list";
 import { SavedViewBar } from "@/components/crm/saved-view-bar";
@@ -48,20 +49,21 @@ export default async function ContactsPage({
     <div className="mx-auto max-w-7xl">
       <PageHeading
         eyebrow="Contacts"
-        title="連絡先"
+        title="コンタクト"
         description="見込み顧客や取引先担当者を管理します。"
       />
+      <ObjectNav active="contacts" />
       <SavedViewBar objectType="CONTACT" q={q} />
       <ListToolbar
         q={q}
         newHref="/contacts/new"
-        newLabel="連絡先を追加"
+        newLabel="コンタクトを追加"
         exportHref="/api/exports/contacts"
       />
       <RecordList
         items={items}
         basePath="/contacts"
-        emptyMessage="最初の連絡先を登録しましょう。"
+        emptyMessage="最初のコンタクトを登録しましょう。"
         columns={[
           {
             key: "name",

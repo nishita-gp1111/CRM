@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { ObjectNav } from "@/components/crm/object-nav";
 import { Pagination } from "@/components/crm/pagination";
 import { RecordList } from "@/components/crm/record-list";
 import { SavedViewBar } from "@/components/crm/saved-view-bar";
@@ -53,6 +54,7 @@ export default async function DealsPage({
           </Link>
         }
       />
+      <ObjectNav active="deals" />
       <SavedViewBar objectType="DEAL" q={q} />
       <ListToolbar
         q={q}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ObjectNav } from "@/components/crm/object-nav";
 import { KanbanBoard } from "@/components/deals/kanban-board";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
@@ -94,6 +95,7 @@ export default async function DealBoardPage({
           </div>
         }
       />
+      <ObjectNav active="board" />
       <form className="mb-5 flex flex-wrap gap-2">
         <select
           className="text-field max-w-sm"

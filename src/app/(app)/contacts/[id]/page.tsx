@@ -47,7 +47,7 @@ export default async function ContactDetailPage({
         }
         description={
           item.jobTitle ??
-          "連絡先の基本情報、活動履歴、関連データを確認できます。"
+          "コンタクトの基本情報、活動履歴、関連データを確認できます。"
         }
         action={
           <Link className="secondary-button" href="/contacts">

@@ -6,9 +6,12 @@ import { Icon } from "@/components/ui/icon";
 
 const navigation = [
   { href: "/dashboard", label: "ダッシュボード", icon: "dashboard" },
-  { href: "/contacts", label: "連絡先", icon: "contacts" },
-  { href: "/companies", label: "会社", icon: "companies" },
-  { href: "/deals", label: "商談", icon: "deals" },
+  {
+    href: "/contacts",
+    label: "コンタクト",
+    icon: "contacts",
+    activePrefixes: ["/contacts", "/companies", "/deals"],
+  },
   { href: "/tasks", label: "タスク", icon: "tasks" },
   { href: "/imports", label: "インポート", icon: "import" },
   { href: "/forms", label: "フォーム", icon: "forms" },
@@ -30,8 +33,12 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 px-3 py-6">
         {navigation.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const prefixes =
+            "activePrefixes" in item ? item.activePrefixes : [item.href];
+          const active = prefixes.some(
+            (prefix) =>
+              pathname === prefix || pathname.startsWith(`${prefix}/`),
+          );
           return (
             <Link
               key={item.href}

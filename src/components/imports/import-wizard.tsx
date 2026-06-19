@@ -12,7 +12,7 @@ type Preview = {
   totalRows: number;
   truncated: boolean;
 };
-const labels = { CONTACT: "連絡先", COMPANY: "会社", DEAL: "商談" };
+const labels = { CONTACT: "コンタクト", COMPANY: "会社", DEAL: "商談" };
 const aliases: Record<
   "CONTACT" | "COMPANY" | "DEAL",
   Record<string, string[]>
@@ -59,7 +59,7 @@ const aliases: Record<
     ownerEmail: ["担当者", "担当者メール", "owner"],
     companyName: ["会社", "会社名", "法人名", "企業名"],
     companyDomain: ["ドメイン", "会社ドメイン"],
-    contactEmail: ["連絡先メール", "担当者メールアドレス", "顧客メール"],
+    contactEmail: ["コンタクトメール", "担当者メールアドレス", "顧客メール"],
   },
 };
 export function ImportWizard({
@@ -131,7 +131,7 @@ export function ImportWizard({
                 setMapping({});
               }}
             >
-              <option value="CONTACT">連絡先</option>
+              <option value="CONTACT">コンタクト</option>
               <option value="COMPANY">会社</option>
               <option value="DEAL">商談</option>
             </select>

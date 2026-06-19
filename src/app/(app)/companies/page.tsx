@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { ObjectNav } from "@/components/crm/object-nav";
 import { Pagination } from "@/components/crm/pagination";
 import { RecordList } from "@/components/crm/record-list";
 import { SavedViewBar } from "@/components/crm/saved-view-bar";
@@ -50,6 +51,7 @@ export default async function CompaniesPage({
         title="会社"
         description="取引先企業の基本情報と関連データを管理します。"
       />
+      <ObjectNav active="companies" />
       <SavedViewBar objectType="COMPANY" q={q} />
       <ListToolbar
         q={q}

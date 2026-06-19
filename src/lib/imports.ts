@@ -44,7 +44,7 @@ export const importFields: Record<ImportObjectType, ImportField[]> = {
     { value: "ownerEmail", label: "担当者メール" },
     { value: "companyName", label: "会社名" },
     { value: "companyDomain", label: "会社ドメイン" },
-    { value: "contactEmail", label: "連絡先メール" },
+    { value: "contactEmail", label: "コンタクトメール" },
   ],
 };
 

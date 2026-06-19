@@ -15,7 +15,7 @@ export default async function NewContactPage() {
     <div className="mx-auto max-w-7xl">
       <PageHeading
         eyebrow="New contact"
-        title="連絡先を追加"
+        title="コンタクトを追加"
         description="メールアドレスが未登録の場合、重複判定は行われません。"
       />
       <RecordForm

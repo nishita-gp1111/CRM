@@ -23,7 +23,7 @@ export default async function EditContactPage({
 
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeading eyebrow="Edit contact" title="連絡先を編集" />
+      <PageHeading eyebrow="Edit contact" title="コンタクトを編集" />
       <RecordForm
         type="contact"
         recordId={id}
