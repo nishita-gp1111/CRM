@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ImportWizard } from "@/components/imports/import-wizard";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
+import { canUseLegacyProgressImport } from "@/lib/feature-flags";
 import { importFields } from "@/lib/imports";
 import { prisma } from "@/lib/prisma";
 export default async function ImportsPage() {
@@ -51,9 +52,11 @@ export default async function ImportsPage() {
         title="データインポート"
         description="CSV、XLSX、貼り付けた表データをマッピングして一括作成・更新します。"
         action={
-          <Link href="/imports/legacy-progress" className="secondary-button">
-            進捗管理Excel
-          </Link>
+          canUseLegacyProgressImport(context.membership.role) ? (
+            <Link href="/imports/legacy-progress" className="secondary-button">
+              進捗管理Excel
+            </Link>
+          ) : null
         }
       />
       <ImportWizard fields={fields} />

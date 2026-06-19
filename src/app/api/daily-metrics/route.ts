@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { apiError, getRequestMetadata } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { assertBusinessUnitAccess } from "@/lib/business-units";
-import { Permission, requirePermission } from "@/lib/permissions";
+import {
+  AuthorizationError,
+  hasPermission,
+  Permission,
+  requirePermission,
+} from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { dailyMetricsPutSchema, metricQuerySchema } from "@/lib/validation";
 
@@ -83,6 +88,19 @@ export async function PUT(request: Request) {
             metricDefinitionId: entry.metricDefinitionId,
           },
         });
+        if (String(existing?.status) === "LOCKED") {
+          throw new AuthorizationError(
+            "ロック済みの日次実績は変更できません。解除してから編集してください。",
+          );
+        }
+        if (
+          existing?.status === "APPROVED" &&
+          !hasPermission(context.membership.role, Permission.MANAGE_TARGETS)
+        ) {
+          throw new AuthorizationError(
+            "承認済みの日次実績は管理者のみ変更できます。",
+          );
+        }
         const item = existing
           ? await tx.dailyMetricEntry.update({
               where: { id: existing.id },

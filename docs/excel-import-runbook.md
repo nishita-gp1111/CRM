@@ -5,7 +5,10 @@
 1. Open `/imports/legacy-progress`.
 2. Upload the progress management `.xlsx`.
 3. Review read rows, candidates, unknown users, unknown products, unknown progress values, invalid dates, and amount errors.
-4. Save the dry-run result as an ImportJob only after reviewing the preview.
+4. Keep the dry-run result for mapping review. The apply step is disabled by default.
+
+`/imports/legacy-progress` is limited to `SUPER_ADMIN` and `ADMIN`.
+`LEGACY_EXCEL_IMPORT_ENABLED` defaults to `false`; when it is false, the apply API returns an error and no CRM records are created.
 
 ## Mapping Review
 
@@ -31,6 +34,8 @@ The migration design uses `LegacySourceLink`:
 
 The same workbook row must not create duplicate records on re-run.
 
-## Current Phase 2 Behavior
+## Current Behavior
 
-The implemented UI/API supports dry run and stores a mapping-confirmation ImportJob. It intentionally does not create CRM records without a mapping confirmation step.
+The implemented UI/API supports dry run for understanding the legacy workbook. CRM daily operations do not depend on workbook sheets, cells, or legacy progress values.
+
+The future apply interface remains in place, but production apply is gated by `LEGACY_EXCEL_IMPORT_ENABLED`. Excel migration is not a deploy blocker for Phase 3-A.

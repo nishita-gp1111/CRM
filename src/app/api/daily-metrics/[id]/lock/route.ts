@@ -16,11 +16,10 @@ export async function POST(_: Request, { params }: Params) {
     const item = await prisma.dailyMetricEntry.update({
       where: { id, organizationId: context.organization.id },
       data: {
-        status: "DRAFT",
-        submittedAt: null,
-        approvedAt: null,
-        approvedByUserId: null,
-        lockedAt: null,
+        status: "LOCKED",
+        lockedAt: new Date(),
+        approvedAt: new Date(),
+        approvedByUserId: context.user.id,
       },
     });
     return NextResponse.json({ item });

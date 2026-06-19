@@ -2,7 +2,7 @@
 
 営業代行会社・Web制作会社・広告代理店向けの営業CRMです。HubSpotのCRM思想を参考にしつつ、UI・名称・文言は独自に設計しています。
 
-現在は既存CRM機能に加えて、営業オペレーション管理CRMへ拡張するための **Phase 2 KPI基盤** まで実装済みです。認証・CRMコア、インポート、公開フォーム、日程調整、メールログ、Web問い合わせ受付、事業部切り替え、KPIレポート、日次実績、商品/価格、目標、進捗管理Excel dry runを利用できます。
+現在は既存CRM機能に加えて、営業オペレーション管理CRMへ拡張するための **Phase 3-A KPI実運用** まで実装済みです。認証・CRMコア、インポート、公開フォーム、日程調整、メールログ、Web問い合わせ受付、事業部切り替え、KPIレポート、日次実績、商品/価格、目標、ActionPlan、進捗管理Excel dry runを利用できます。
 
 ## 技術構成
 
@@ -28,13 +28,14 @@ npm install
 cp .env.example .env
 ```
 
-| 変数                  | 用途                     |
-| --------------------- | ------------------------ |
-| `DATABASE_URL`        | PostgreSQL接続URL        |
-| `SESSION_COOKIE_NAME` | 認証Cookie名             |
-| `SESSION_TTL_DAYS`    | セッション有効日数       |
-| `APP_URL`             | 招待URL生成に使う公開URL |
+| 変数 | 用途 |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL接続URL |
+| `SESSION_COOKIE_NAME` | 認証Cookie名 |
+| `SESSION_TTL_DAYS` | セッション有効日数 |
+| `APP_URL` | 招待URL生成に使う公開URL |
 | `LEGACY_PROGRESS_IMPORT_MAX_BYTES` | 進捗管理Excelの推奨上限 |
+| `LEGACY_EXCEL_IMPORT_ENABLED` | 進捗管理Excel applyのfeature flag。初期値は`false` |
 
 ### 3. PostgreSQL
 
@@ -201,7 +202,7 @@ npm run build
 - 組織slugごとの公開問い合わせページとiframe埋め込みコード
 - 問い合わせの会話一覧、担当者情報作成・更新、チャット活動記録
 
-## Phase 2 KPI基盤の実装範囲
+## Phase 3-A KPI実運用の実装範囲
 
 - Product / BusinessUnitProduct / PriceBookEntry
 - DealLineItemによる商談と商品明細の分離
@@ -215,10 +216,12 @@ npm run build
 - BusinessCalendar / BusinessCalendarException
 - ActionPlan
 - LegacySourceLink
-- `/reports`: KPIスコアカード
-- `/daily-metrics`: 日次実績入力
-- `/imports/legacy-progress`: 進捗管理Excel dry run
+- `/reports`: KPIスコアカード、フィルター、前期間比、元データドリルダウン、必要行動量、データ品質警告、ActionPlan
+- `/daily-metrics`: 日次実績入力、提出、承認、ロック、未入力者一覧
+- `/imports/legacy-progress`: 管理者限定の進捗管理Excel dry run。applyは`LEGACY_EXCEL_IMPORT_ENABLED=true`のときだけ有効
 - `/settings/kpis`, `/settings/products`, `/settings/targets`
+
+進捗管理Excelのdry runは、現行運用理解と将来移行に備えるために保持しています。今回のCRMの日常運用ロジックはExcelのセル、シート、進捗値へ依存しません。
 
 詳細:
 
@@ -273,7 +276,18 @@ npm run build
 | `PATCH`        | `/api/organizations/members/:memberId` | ロール・状態変更         |
 | `POST`         | `/api/imports/preview`                 | CSV/XLSX/貼り付け解析    |
 | `POST`         | `/api/imports/execute`                 | データインポート実行     |
+| `POST`         | `/api/imports/legacy-progress/dry-run` | 進捗管理Excel dry run    |
 | `GET`          | `/api/exports/:objectType`             | CSVエクスポート          |
+| `GET` / `POST` | `/api/metrics`                         | KPI集計 / KPI定義作成    |
+| `GET`          | `/api/metrics/:id/drilldown`           | KPI元データ取得          |
+| `GET` / `PUT`  | `/api/daily-metrics`                   | 日次実績取得 / 保存      |
+| `POST`         | `/api/daily-metrics/submit`            | 日次実績提出             |
+| `POST`         | `/api/daily-metrics/:id/approve`       | 日次実績承認             |
+| `POST`         | `/api/daily-metrics/:id/lock`          | 日次実績ロック           |
+| `POST`         | `/api/daily-metrics/:id/unlock`        | 日次実績解除             |
+| `GET` / `POST` | `/api/action-plans`                    | ActionPlan一覧 / 作成    |
+| `PATCH`        | `/api/action-plans/:id`                | ActionPlan編集           |
+| `POST`         | `/api/action-plans/:id/complete`       | ActionPlan完了           |
 | `GET` / `POST` | `/api/saved-views`                     | 保存ビュー一覧 / 作成    |
 | `GET` / `POST` | `/api/custom-properties`               | カスタム項目一覧 / 作成  |
 | `GET` / `POST` | `/api/forms`                           | フォーム一覧 / 作成      |

@@ -2,6 +2,10 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { apiError, getRequestMetadata } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import {
+  canUseLegacyProgressImport,
+  isLegacyExcelImportEnabled,
+} from "@/lib/feature-flags";
 import { Permission, requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { legacyProgressApplySchema } from "@/lib/validation";
@@ -12,6 +16,21 @@ export async function POST(request: Request) {
     if (!context)
       return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
     requirePermission(context.membership.role, Permission.IMPORT_DATA);
+    if (!canUseLegacyProgressImport(context.membership.role)) {
+      return NextResponse.json(
+        { message: "進捗管理Excelの保存は管理者のみ実行できます。" },
+        { status: 403 },
+      );
+    }
+    if (!isLegacyExcelImportEnabled()) {
+      return NextResponse.json(
+        {
+          message:
+            "進捗管理Excelの本登録は現在無効です。dry run結果の確認のみ利用できます。",
+        },
+        { status: 403 },
+      );
+    }
     const input = legacyProgressApplySchema.parse(await request.json());
     const metadata = getRequestMetadata(request);
     const job = await prisma.$transaction(async (tx) => {

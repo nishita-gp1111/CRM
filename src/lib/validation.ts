@@ -487,6 +487,26 @@ export const dailyMetricsSubmitSchema = z.object({
   targetDate: z.coerce.date(),
 });
 
+export const actionPlanSchema = z.object({
+  businessUnitId: optionalUuid,
+  workFunction: z.enum(["IS", "FS", "CS"]).nullable().optional(),
+  ownerUserId: optionalUuid,
+  targetId: optionalUuid,
+  metricDefinitionId: optionalUuid,
+  title: z.string().trim().min(1, "アクション名を入力してください。").max(200),
+  description: optionalText(5000),
+  dueDate: optionalDate,
+  status: z
+    .enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+    .default("NOT_STARTED"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+});
+
+export const actionPlanUpdateSchema = actionPlanSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+  { message: "変更内容を指定してください。" },
+);
+
 export const kpiTargetSchema = z.object({
   metricDefinitionId: z.string().uuid(),
   businessUnitId: optionalUuid,

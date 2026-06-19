@@ -63,6 +63,33 @@ export type RequiredActivityPlan = {
   requiredAppointments: number | null;
   requiredCalls: number | null;
   dailyRequiredCalls: number | null;
+  calculationBasis: {
+    winRate: number;
+    appointmentToMeetingRate: number;
+    callToAppointmentRate: number;
+    remainingWorkingDays: number;
+  };
+};
+
+export type KpiDataQualityWarning = {
+  id: string;
+  severity: "INFO" | "WARNING" | "ERROR";
+  title: string;
+  detail: string;
+  metricDefinitionId?: string;
+};
+
+export type ActionPlanSummary = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  dueDate: string | null;
+  ownerUserId: string | null;
+  businessUnitId: string | null;
+  workFunction: string | null;
+  metricDefinition: { id: string; displayName: string } | null;
 };
 
 export type KpiDashboardData = {
@@ -76,6 +103,8 @@ export type KpiDashboardData = {
   businessCalendar: BusinessCalendarSummary;
   metrics: MetricCalculationResult[];
   requiredActivity: RequiredActivityPlan;
+  dataQualityWarnings: KpiDataQualityWarning[];
+  actionPlans: ActionPlanSummary[];
   updatedAt: string;
 };
 
@@ -114,6 +143,26 @@ function dateRangeWhere(field: string | null, filter: MetricFilter) {
   return field
     ? { [field]: { gte: filter.periodStart, lte: filter.periodEnd } }
     : {};
+}
+
+function previousPeriod(filter: MetricFilter): MetricFilter {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days =
+    Math.floor(
+      (filter.periodEnd.getTime() - filter.periodStart.getTime()) / dayMs,
+    ) + 1;
+  const periodEnd = new Date(filter.periodStart.getTime() - dayMs);
+  const periodStart = new Date(periodEnd.getTime() - (days - 1) * dayMs);
+  return {
+    ...filter,
+    periodStart,
+    periodEnd,
+  };
+}
+
+function changeRate(current: number | null, previous: number | null) {
+  if (current === null || previous === null || previous === 0) return null;
+  return (current - previous) / Math.abs(previous);
 }
 
 function commonWhere(
@@ -443,8 +492,10 @@ export async function getKpiDashboardData(
     take: 80,
   });
   const metricByKey = new Map(metrics.map((metric) => [metric.key, metric]));
-  const cache = new Map<string, MetricCalculationResult>();
-  const [businessCalendar, metricResults] = await Promise.all([
+  const currentCache = new Map<string, MetricCalculationResult>();
+  const previousCache = new Map<string, MetricCalculationResult>();
+  const previousFilter = previousPeriod(fullFilter);
+  const [businessCalendar, currentMetricResults, previousMetricResults] = await Promise.all([
     getBusinessCalendarSummary({
       organizationId: context.organization.id,
       businessUnitId: fullFilter.businessUnitId,
@@ -458,10 +509,40 @@ export async function getKpiDashboardData(
           metric,
           filter: fullFilter,
           metricByKey,
-          cache,
+          cache: currentCache,
         }),
       ),
     ),
+    Promise.all(
+      metrics.map((metric) =>
+        calculateMetric({
+          organizationId: context.organization.id,
+          metric,
+          filter: previousFilter,
+          metricByKey,
+          cache: previousCache,
+        }),
+      ),
+    ),
+  ]);
+  const metricResults = currentMetricResults.map((result, index) => {
+    const previousValue = previousMetricResults[index]?.value ?? null;
+    return {
+      ...result,
+      previousPeriodValue: previousValue,
+      changeRate: changeRate(result.value, previousValue),
+    };
+  });
+  const [dataQualityWarnings, actionPlans] = await Promise.all([
+    getKpiDataQualityWarnings({
+      organizationId: context.organization.id,
+      filter: fullFilter,
+      results: metricResults,
+    }),
+    getOpenActionPlans({
+      organizationId: context.organization.id,
+      filter: fullFilter,
+    }),
   ]);
 
   return {
@@ -475,6 +556,8 @@ export async function getKpiDashboardData(
     businessCalendar,
     metrics: metricResults,
     requiredActivity: calculateRequiredActivity(metricResults, businessCalendar),
+    dataQualityWarnings,
+    actionPlans,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -546,7 +629,120 @@ export function calculateRequiredActivity(
       requiredCalls !== null && calendar.remainingWorkingDays > 0
         ? Math.ceil(requiredCalls / calendar.remainingWorkingDays)
         : null,
+    calculationBasis: {
+      winRate,
+      appointmentToMeetingRate,
+      callToAppointmentRate,
+      remainingWorkingDays: calendar.remainingWorkingDays,
+    },
   };
+}
+
+async function getKpiDataQualityWarnings(input: {
+  organizationId: string;
+  filter: MetricFilter;
+  results: MetricCalculationResult[];
+}): Promise<KpiDataQualityWarning[]> {
+  const warnings: KpiDataQualityWarning[] = [];
+  for (const result of input.results) {
+    if (
+      result.metricDefinition.unit === MetricUnit.PERCENT &&
+      result.denominator !== null &&
+      result.denominator <= 0
+    ) {
+      warnings.push({
+        id: `denominator:${result.metricDefinition.id}`,
+        severity: "INFO",
+        title: `${result.metricDefinition.displayName}は未計算です`,
+        detail: "分母が0のため、率は表示していません。",
+        metricDefinitionId: result.metricDefinition.id,
+      });
+    }
+    if (result.sampleSize === 0 && result.target !== null && result.target > 0) {
+      warnings.push({
+        id: `no-source:${result.metricDefinition.id}`,
+        severity: "WARNING",
+        title: `${result.metricDefinition.displayName}の元データがありません`,
+        detail: "目標は設定されていますが、対象期間内の実績データが0件です。",
+        metricDefinitionId: result.metricDefinition.id,
+      });
+    }
+    if (result.target === null && result.metricDefinition.category !== "CONVERSION") {
+      warnings.push({
+        id: `no-target:${result.metricDefinition.id}`,
+        severity: "INFO",
+        title: `${result.metricDefinition.displayName}の目標が未設定です`,
+        detail: "達成率と残数を表示するには、対象期間のKPI目標を設定してください。",
+        metricDefinitionId: result.metricDefinition.id,
+      });
+    }
+  }
+
+  const draftDailyCount = await prisma.dailyMetricEntry.count({
+    where: {
+      organizationId: input.organizationId,
+      targetDate: {
+        gte: input.filter.periodStart,
+        lte: input.filter.periodEnd,
+      },
+      status: "DRAFT",
+      ...(input.filter.businessUnitId
+        ? { businessUnitId: input.filter.businessUnitId }
+        : {}),
+      ...(input.filter.workFunction
+        ? { workFunction: input.filter.workFunction }
+        : {}),
+      ...(input.filter.userId ? { userId: input.filter.userId } : {}),
+    },
+  });
+  if (draftDailyCount > 0) {
+    warnings.unshift({
+      id: "daily-draft",
+      severity: "WARNING",
+      title: "未提出の日次実績があります",
+      detail: `${draftDailyCount.toLocaleString("ja-JP")}件がDRAFTのままです。日次入力画面で提出してください。`,
+    });
+  }
+
+  return warnings.slice(0, 12);
+}
+
+async function getOpenActionPlans(input: {
+  organizationId: string;
+  filter: MetricFilter;
+}): Promise<ActionPlanSummary[]> {
+  const items = await prisma.actionPlan.findMany({
+    where: {
+      organizationId: input.organizationId,
+      status: { notIn: ["COMPLETED", "CANCELLED"] },
+      ...(input.filter.businessUnitId
+        ? { OR: [{ businessUnitId: input.filter.businessUnitId }, { businessUnitId: null }] }
+        : {}),
+      ...(input.filter.workFunction
+        ? { OR: [{ workFunction: input.filter.workFunction }, { workFunction: null }] }
+        : {}),
+      ...(input.filter.userId
+        ? { OR: [{ ownerUserId: input.filter.userId }, { ownerUserId: null }] }
+        : {}),
+    },
+    include: {
+      metricDefinition: { select: { id: true, displayName: true } },
+    },
+    orderBy: [{ priority: "desc" }, { dueDate: "asc" }, { updatedAt: "desc" }],
+    take: 12,
+  });
+  return items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    status: item.status,
+    priority: item.priority,
+    dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
+    ownerUserId: item.ownerUserId,
+    businessUnitId: item.businessUnitId,
+    workFunction: item.workFunction,
+    metricDefinition: item.metricDefinition,
+  }));
 }
 
 export async function getMetricDrilldown(input: {
@@ -554,6 +750,9 @@ export async function getMetricDrilldown(input: {
   metricId: string;
   periodStart: Date;
   periodEnd: Date;
+  businessUnitId?: string | null;
+  workFunction?: "IS" | "FS" | "CS" | null;
+  userId?: string | null;
   page?: number;
   pageSize?: number;
 }) {
@@ -575,13 +774,26 @@ export async function getMetricDrilldown(input: {
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
       } as MetricFilter),
-      ...(metric.businessUnitId ? { businessUnitId: metric.businessUnitId } : {}),
+      ...(input.businessUnitId
+        ? { businessUnitId: input.businessUnitId }
+        : metric.businessUnitId
+          ? { businessUnitId: metric.businessUnitId }
+          : {}),
       ...(statuses.length ? { status: { in: statuses as never[] } } : {}),
+      ...(input.userId ? { ownerUserId: input.userId } : {}),
     };
     const [items, total] = await Promise.all([
       prisma.deal.findMany({
         where,
-        select: { id: true, name: true, status: true, closeDate: true, amount: true },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          closeDate: true,
+          expectedCloseDate: true,
+          amount: true,
+          ownerUserId: true,
+        },
         orderBy: { updatedAt: "desc" },
         skip,
         take: pageSize,
@@ -592,13 +804,31 @@ export async function getMetricDrilldown(input: {
   }
 
   if (metric.sourceType === MetricSourceType.DEAL_LINE_ITEM) {
+    const statuses = stringArray(queryDefinition.status);
+    const productNames = stringArray(queryDefinition.productNames);
+    const dealWhere: Prisma.DealWhereInput = {};
+    if (metric.dateField === "expectedCloseDate") {
+      dealWhere.expectedCloseDate = { gte: input.periodStart, lte: input.periodEnd };
+    }
+    if (input.userId) dealWhere.ownerUserId = input.userId;
     const where: Prisma.DealLineItemWhereInput = {
       organizationId: input.organizationId,
-      ...(metric.businessUnitId ? { businessUnitId: metric.businessUnitId } : {}),
-      ...dateRangeWhere(metric.dateField ?? "billingStartedAt", {
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
-      } as MetricFilter),
+      ...(input.businessUnitId
+        ? { businessUnitId: input.businessUnitId }
+        : metric.businessUnitId
+          ? { businessUnitId: metric.businessUnitId }
+          : {}),
+      ...(metric.dateField === "expectedCloseDate"
+        ? {}
+        : dateRangeWhere(metric.dateField ?? "billingStartedAt", {
+            periodStart: input.periodStart,
+            periodEnd: input.periodEnd,
+          } as MetricFilter)),
+      ...(statuses.length ? { status: { in: statuses as DealLineItemStatus[] } } : {}),
+      ...(productNames.length
+        ? { product: { name: { in: productNames } } }
+        : {}),
+      ...(Object.keys(dealWhere).length ? { deal: dealWhere } : {}),
     };
     const [items, total] = await Promise.all([
       prisma.dealLineItem.findMany({
@@ -616,12 +846,122 @@ export async function getMetricDrilldown(input: {
     return { metric, items, total };
   }
 
+  if (metric.sourceType === MetricSourceType.PERFORMANCE_EVENT) {
+    const eventTypes = stringArray(queryDefinition.eventType);
+    const where: Prisma.SalesPerformanceEventWhereInput = {
+      organizationId: input.organizationId,
+      cancelledAt: null,
+      occurredAt: { gte: input.periodStart, lte: input.periodEnd },
+      ...(input.businessUnitId
+        ? { businessUnitId: input.businessUnitId }
+        : metric.businessUnitId
+          ? { businessUnitId: metric.businessUnitId }
+          : {}),
+      ...(input.workFunction ? { workFunction: input.workFunction } : {}),
+      ...(input.userId ? { creditedUserId: input.userId } : {}),
+      ...(eventTypes.length ? { eventType: { in: eventTypes as never[] } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.salesPerformanceEvent.findMany({
+        where,
+        select: {
+          id: true,
+          eventType: true,
+          occurredAt: true,
+          quantity: true,
+          amount: true,
+          creditedUserId: true,
+          workFunction: true,
+          dealId: true,
+          dealLineItemId: true,
+          source: true,
+        },
+        orderBy: { occurredAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.salesPerformanceEvent.count({ where }),
+    ]);
+    return { metric, items, total };
+  }
+
+  if (metric.sourceType === MetricSourceType.REFERRAL) {
+    const where: Prisma.ReferralWhereInput = {
+      organizationId: input.organizationId,
+      referredAt: { gte: input.periodStart, lte: input.periodEnd },
+      ...(input.businessUnitId
+        ? { businessUnitId: input.businessUnitId }
+        : metric.businessUnitId
+          ? { businessUnitId: metric.businessUnitId }
+          : {}),
+      ...(input.userId ? { referrerUserId: input.userId } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.referral.findMany({
+        where,
+        select: {
+          id: true,
+          referredCompanyName: true,
+          referredContactName: true,
+          status: true,
+          referredAt: true,
+          referrerUserId: true,
+          ownerUserId: true,
+        },
+        orderBy: { referredAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.referral.count({ where }),
+    ]);
+    return { metric, items, total };
+  }
+
+  if (metric.sourceType === MetricSourceType.FIELD_VISIT) {
+    const where: Prisma.FieldVisitWhereInput = {
+      organizationId: input.organizationId,
+      visitedAt: { gte: input.periodStart, lte: input.periodEnd },
+      ...(input.businessUnitId
+        ? { businessUnitId: input.businessUnitId }
+        : metric.businessUnitId
+          ? { businessUnitId: metric.businessUnitId }
+          : {}),
+      ...(input.userId ? { ownerUserId: input.userId } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.fieldVisit.findMany({
+        where,
+        select: {
+          id: true,
+          companyName: true,
+          contactName: true,
+          status: true,
+          visitedAt: true,
+          ownerUserId: true,
+          sameDayWon: true,
+        },
+        orderBy: { visitedAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.fieldVisit.count({ where }),
+    ]);
+    return { metric, items, total };
+  }
+
   const [items, total] = await Promise.all([
     prisma.dailyMetricEntry.findMany({
       where: {
         organizationId: input.organizationId,
         metricDefinitionId: metric.id,
         targetDate: { gte: input.periodStart, lte: input.periodEnd },
+        ...(input.businessUnitId
+          ? { businessUnitId: input.businessUnitId }
+          : metric.businessUnitId
+            ? { businessUnitId: metric.businessUnitId }
+            : {}),
+        ...(input.workFunction ? { workFunction: input.workFunction } : {}),
+        ...(input.userId ? { userId: input.userId } : {}),
       },
       orderBy: { targetDate: "desc" },
       skip,
@@ -632,6 +972,13 @@ export async function getMetricDrilldown(input: {
         organizationId: input.organizationId,
         metricDefinitionId: metric.id,
         targetDate: { gte: input.periodStart, lte: input.periodEnd },
+        ...(input.businessUnitId
+          ? { businessUnitId: input.businessUnitId }
+          : metric.businessUnitId
+            ? { businessUnitId: metric.businessUnitId }
+            : {}),
+        ...(input.workFunction ? { workFunction: input.workFunction } : {}),
+        ...(input.userId ? { userId: input.userId } : {}),
       },
     }),
   ]);

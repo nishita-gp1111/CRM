@@ -10,7 +10,11 @@ type DryRunResult = {
   warnings: string[];
 };
 
-export function LegacyProgressImporter() {
+export function LegacyProgressImporter({
+  applyEnabled,
+}: {
+  applyEnabled: boolean;
+}) {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<DryRunResult | null>(null);
   const [message, setMessage] = useState("");
@@ -90,9 +94,20 @@ export function LegacyProgressImporter() {
                 {result.sourceName}
               </p>
             </div>
-            <button className="secondary-button" type="button" onClick={savePreview} disabled={pending}>
-              マッピング確認用に保存
-            </button>
+            {applyEnabled ? (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={savePreview}
+                disabled={pending}
+              >
+                マッピング確認用に保存
+              </button>
+            ) : (
+              <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                本登録はデプロイ前スコープ外
+              </span>
+            )}
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-4">
             {Object.entries(result.totals).slice(0, 12).map(([key, value]) => (
