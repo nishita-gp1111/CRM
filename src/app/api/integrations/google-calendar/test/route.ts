@@ -4,19 +4,35 @@ import { getAuthContext } from "@/lib/auth";
 import { listGoogleCalendars } from "@/lib/google-calendar";
 
 export async function POST() {
+  const requestId = crypto.randomUUID();
   try {
     const context = await getAuthContext();
-    if (!context)
+    if (!context) {
+      console.warn("Google Calendar test blocked: unauthenticated", {
+        requestId,
+      });
       return NextResponse.json(
-        { message: "ログインが必要です。" },
+        { message: "ログインが必要です。", requestId },
         { status: 401 },
       );
+    }
     const calendars = await listGoogleCalendars({
       organizationId: context.organization.id,
       userId: context.user.id,
     });
-    return NextResponse.json({ ok: true, calendarCount: calendars.length });
+    console.info("Google Calendar test succeeded", {
+      requestId,
+      organizationId: context.organization.id,
+      userId: context.user.id,
+      calendarCount: calendars.length,
+    });
+    return NextResponse.json({
+      ok: true,
+      calendarCount: calendars.length,
+      requestId,
+    });
   } catch (error) {
+    console.error("Google Calendar test failed", { requestId, error });
     return apiError(error);
   }
 }

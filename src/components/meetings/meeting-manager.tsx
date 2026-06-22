@@ -71,6 +71,7 @@ export function MeetingManager({
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [googleCalendarTestPending, setGoogleCalendarTestPending] = useState(false);
   async function saveAvailability(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -141,6 +142,33 @@ export function MeetingManager({
     setMessage("処理を実行しました。");
     router.refresh();
   }
+  async function testGoogleCalendarConnection() {
+    setGoogleCalendarTestPending(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/integrations/google-calendar/test", {
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(result.message ?? "Google Calendarの接続テストに失敗しました。");
+        return;
+      }
+
+      const calendarCount =
+        typeof result.calendarCount === "number" ? result.calendarCount : 0;
+      setMessage(`Google Calendarの接続テストに成功しました。取得できたカレンダー: ${calendarCount}件`);
+      router.refresh();
+    } catch (testError) {
+      console.error("Google Calendar connection test request failed", testError);
+      setError("Google Calendarの接続テストに失敗しました。通信状態を確認してください。");
+    } finally {
+      setGoogleCalendarTestPending(false);
+    }
+  }
   return (
     <div className="space-y-6">
       <section className="card flex flex-col justify-between gap-4 p-6 md:flex-row md:items-center">
@@ -170,10 +198,10 @@ export function MeetingManager({
           <button
             className="secondary-button"
             type="button"
-            disabled={!googleCalendarEnabled}
-            onClick={() => fetch("/api/integrations/google-calendar/test", { method: "POST" })}
+            disabled={!googleCalendarEnabled || googleCalendarTestPending}
+            onClick={testGoogleCalendarConnection}
           >
-            接続テスト
+            {googleCalendarTestPending ? "確認中..." : "接続テスト"}
           </button>
           <button
             className="secondary-button"
@@ -192,6 +220,16 @@ export function MeetingManager({
             Watch再作成
           </button>
         </div>
+        {error ? (
+          <p role="alert" className="text-sm font-bold text-red-600">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p role="status" className="text-sm font-bold text-brand-700">
+            {message}
+          </p>
+        ) : null}
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
