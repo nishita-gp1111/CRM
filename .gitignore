@@ -10,3 +10,5 @@ work
 *.tsbuildinfo
 prisma/dev.db
 .DS_Store
+.vercel
+.env.vercel.production

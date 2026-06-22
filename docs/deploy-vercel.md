@@ -16,9 +16,9 @@ not Cloudflare Pages Edge conversion.
 | Root directory | `/` |
 | Node.js version | `20.x` |
 
-The `build` script runs `prisma generate && next build`, so Prisma Client is
-generated during Vercel builds. The Cloudflare `pages:build` script remains in
-`package.json`, but do not use it for this Vercel validation.
+The `build` script runs `node scripts/vercel-build.mjs`, which generates Prisma
+Client and then runs `next build`. The Cloudflare `pages:build` script remains
+in `package.json`, but do not use it for this Vercel validation.
 
 ## Required Environment Variables
 
@@ -83,6 +83,17 @@ DATABASE_URL="<production-database-url>" npx prisma migrate deploy
 ```
 
 Do not use `prisma migrate dev` against production.
+
+If Vercel environment variables are marked sensitive and cannot be pulled
+locally, run the one-time bootstrap inside Vercel's build environment:
+
+```bash
+vercel deploy --prod --force --build-env BOOTSTRAP_DATABASE_ON_BUILD=true
+```
+
+`BOOTSTRAP_DATABASE_ON_BUILD=true` runs `prisma migrate deploy` and
+`prisma/seed.ts` before the normal build. Do not store this flag permanently in
+the Vercel project. Use it only for the initial empty CRM database.
 
 ## Seed
 
