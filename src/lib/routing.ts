@@ -197,6 +197,14 @@ export async function assignUser(
   },
 ) {
   const mode = input.assignmentMode ?? "ROUND_ROBIN";
+  if (mode === "MANUAL") {
+    return {
+      selectedUserId: input.fixedUserId ?? null,
+      candidateUserIds: input.fixedUserId ? [input.fixedUserId] : [],
+      reason: input.fixedUserId ? "手動担当者" : "手動割り当て",
+      fallbackReason: input.fixedUserId ? null : "手動割り当てのため自動担当者は未設定です。",
+    };
+  }
   if (mode === "FIXED_USER") {
     if (!input.fixedUserId) throw new BadRequestError("固定担当者が設定されていません。");
     return {

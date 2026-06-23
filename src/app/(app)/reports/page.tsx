@@ -149,6 +149,173 @@ function drilldownAmount(item: unknown) {
   );
 }
 
+type FunnelRow = {
+  key: string;
+  label: string;
+  calls: number;
+  connections: number;
+  ownerContacts: number;
+  fulls: number;
+  appointments: number;
+  attended: number;
+  validMeetings: number;
+  invalidMeetings: number;
+  won: number;
+  grossProfit: number;
+  sampleLow: boolean;
+};
+
+function dimensionsOf(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function rate(numerator: number, denominator: number) {
+  return denominator > 0 ? numerator / denominator : null;
+}
+
+function add(row: FunnelRow, type: string, value: number) {
+  if (type === "CALL" || type.includes("架電")) {
+    row.calls += value;
+    return true;
+  }
+  if (type === "CONNECTION" || type.includes("接続")) {
+    row.connections += value;
+    return true;
+  }
+  if (type === "OWNER_CONTACT" || type.includes("オーナー")) {
+    row.ownerContacts += value;
+    return true;
+  }
+  if (type === "FULL" || type.includes("フル")) {
+    row.fulls += value;
+    return true;
+  }
+  return type === "SHORT" || type.includes("ショート") || type === "CONDITION_NG" || type.includes("条件NG");
+}
+
+async function getRegionalFunnelReport(input: {
+  organizationId: string;
+  businessUnitId: string | null;
+  userId: string | null;
+  periodStart: Date;
+  periodEnd: Date;
+  mode: "territory" | "industry" | "call-list";
+}) {
+  const [entries, events, territories, industries, callLists] = await Promise.all([
+    prisma.dailyMetricEntry.findMany({
+      where: {
+        organizationId: input.organizationId,
+        targetDate: { gte: input.periodStart, lte: input.periodEnd },
+        ...(input.businessUnitId ? { businessUnitId: input.businessUnitId } : {}),
+        ...(input.userId ? { userId: input.userId } : {}),
+      },
+      include: { metricDefinition: { select: { key: true, displayName: true } } },
+    }),
+    prisma.salesPerformanceEvent.findMany({
+      where: {
+        organizationId: input.organizationId,
+        occurredAt: { gte: input.periodStart, lte: input.periodEnd },
+        ...(input.businessUnitId ? { businessUnitId: input.businessUnitId } : {}),
+        ...(input.userId ? { creditedUserId: input.userId } : {}),
+        cancelledAt: null,
+      },
+      select: {
+        eventType: true,
+        quantity: true,
+        amount: true,
+        territoryId: true,
+        industryId: true,
+        callListId: true,
+      },
+    }),
+    prisma.salesTerritory.findMany({
+      where: { organizationId: input.organizationId },
+      select: { id: true, name: true },
+    }),
+    prisma.industry.findMany({
+      where: { organizationId: input.organizationId },
+      select: { id: true, name: true },
+    }),
+    prisma.callList.findMany({
+      where: { organizationId: input.organizationId },
+      select: { id: true, name: true },
+    }),
+  ]);
+  const labels = new Map<string, string>();
+  for (const item of territories) labels.set(`territory:${item.id}`, item.name);
+  for (const item of industries) labels.set(`industry:${item.id}`, item.name);
+  for (const item of callLists) labels.set(`call-list:${item.id}`, item.name);
+  const rows = new Map<string, FunnelRow>();
+  const keyFor = (raw: unknown) => {
+    const value = String(raw ?? "");
+    const prefix =
+      input.mode === "territory"
+        ? "territory"
+        : input.mode === "industry"
+          ? "industry"
+          : "call-list";
+    return value ? `${prefix}:${value}` : `${prefix}:unknown`;
+  };
+  const rowFor = (key: string) => {
+    const existing = rows.get(key);
+    if (existing) return existing;
+    const row: FunnelRow = {
+      key,
+      label: labels.get(key) ?? "未設定",
+      calls: 0,
+      connections: 0,
+      ownerContacts: 0,
+      fulls: 0,
+      appointments: 0,
+      attended: 0,
+      validMeetings: 0,
+      invalidMeetings: 0,
+      won: 0,
+      grossProfit: 0,
+      sampleLow: false,
+    };
+    rows.set(key, row);
+    return row;
+  };
+  for (const entry of entries) {
+    const dimensions = dimensionsOf(entry.dimensions);
+    const raw =
+      input.mode === "territory"
+        ? dimensions.territoryId
+        : input.mode === "industry"
+          ? dimensions.industryId
+          : dimensions.callListId;
+    const row = rowFor(keyFor(raw));
+    const value = Number(entry.value);
+    if (!add(row, entry.metricDefinition.key, value)) {
+      add(row, entry.metricDefinition.displayName, value);
+    }
+  }
+  for (const event of events) {
+    const raw =
+      input.mode === "territory"
+        ? event.territoryId
+        : input.mode === "industry"
+          ? event.industryId
+          : event.callListId;
+    const row = rowFor(keyFor(raw));
+    const quantity = Number(event.quantity);
+    if (event.eventType === "APPOINTMENT_SET") row.appointments += quantity;
+    if (event.eventType === "MEETING_ATTENDED") row.attended += quantity;
+    if (event.eventType === "VALID_MEETING") row.validMeetings += quantity;
+    if (event.eventType === "INVALID_MEETING") row.invalidMeetings += quantity;
+    if (event.eventType === "DEAL_WON") row.won += quantity;
+    if (event.eventType === "GROSS_PROFIT_RECOGNIZED") {
+      row.grossProfit += Number(event.amount ?? 0);
+    }
+  }
+  return [...rows.values()]
+    .map((row) => ({ ...row, sampleLow: row.calls > 0 && row.calls < 30 }))
+    .sort((a, b) => b.appointments - a.appointments || b.calls - a.calls);
+}
+
 export default async function ReportsPage({ searchParams }: Props) {
   const context = await getAuthContext();
   if (!context) redirect("/login");
@@ -211,6 +378,9 @@ export default async function ReportsPage({ searchParams }: Props) {
     lossAnalysis,
     salespersonComparison,
     dealAlerts,
+    territoryFunnel,
+    industryFunnel,
+    callListFunnel,
   ] = await Promise.all([
     getSalesProgressReport(context.organization.id, reportFilter),
     getProductPerformanceReport(context.organization.id, reportFilter),
@@ -219,6 +389,30 @@ export default async function ReportsPage({ searchParams }: Props) {
     getSalespersonComparisonReport(context.organization.id, reportFilter),
     getDealQualityAlerts(context.organization.id, {
       businessUnitId: businessUnitId || null,
+    }),
+    getRegionalFunnelReport({
+      organizationId: context.organization.id,
+      businessUnitId: businessUnitId || null,
+      userId: userId || null,
+      periodStart: reportFilter.periodStart,
+      periodEnd: reportFilter.periodEnd,
+      mode: "territory",
+    }),
+    getRegionalFunnelReport({
+      organizationId: context.organization.id,
+      businessUnitId: businessUnitId || null,
+      userId: userId || null,
+      periodStart: reportFilter.periodStart,
+      periodEnd: reportFilter.periodEnd,
+      mode: "industry",
+    }),
+    getRegionalFunnelReport({
+      organizationId: context.organization.id,
+      businessUnitId: businessUnitId || null,
+      userId: userId || null,
+      periodStart: reportFilter.periodStart,
+      periodEnd: reportFilter.periodEnd,
+      mode: "call-list",
     }),
   ]);
   const primaryMetrics = data.metrics.filter(
@@ -262,6 +456,9 @@ export default async function ReportsPage({ searchParams }: Props) {
           ["attachment-rates", "付帯率"],
           ["loss-analysis", "失注分析"],
           ["salesperson-comparison", "営業担当比較"],
+          ["territory-analysis", "地域分析"],
+          ["industry-analysis", "業種分析"],
+          ["call-list-analysis", "架電リスト分析"],
         ].map(([key, label]) => (
           <Link
             key={key}
@@ -358,6 +555,15 @@ export default async function ReportsPage({ searchParams }: Props) {
           data={salespersonComparison}
           alerts={dealAlerts}
         />
+      ) : null}
+      {tab === "territory-analysis" ? (
+        <RegionalFunnelSection title="地域分析" rows={territoryFunnel} />
+      ) : null}
+      {tab === "industry-analysis" ? (
+        <RegionalFunnelSection title="業種分析" rows={industryFunnel} />
+      ) : null}
+      {tab === "call-list-analysis" ? (
+        <RegionalFunnelSection title="架電リスト分析" rows={callListFunnel} />
       ) : null}
 
       <div className={tab === "kpi" ? "" : "hidden"}>
@@ -1205,6 +1411,98 @@ function SalespersonComparisonSection({
       </section>
       {data.warnings.length ? <WarningList warnings={data.warnings} /> : null}
     </div>
+  );
+}
+
+function RegionalFunnelSection({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: FunnelRow[];
+}) {
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-line p-5">
+        <h2 className="font-bold">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          架電から受注までの転換率を、分子と分母を分けて表示します。架電数30未満は参考値です。
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1280px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-500">
+            <tr>
+              {[
+                "分類",
+                "架電",
+                "接続",
+                "オーナー",
+                "フル",
+                "アポ",
+                "出席",
+                "有効商談",
+                "受注",
+                "架電→接続",
+                "接続→オーナー",
+                "オーナー→フル",
+                "フル→アポ",
+                "架電→アポ",
+                "アポ→有効",
+                "有効→受注",
+                "粗利",
+                "判定",
+              ].map((label) => (
+                <th key={label} className="px-4 py-3 text-right first:text-left">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="px-4 py-3 font-semibold">{row.label}</td>
+                <td className="px-4 py-3 text-right">{row.calls}</td>
+                <td className="px-4 py-3 text-right">{row.connections}</td>
+                <td className="px-4 py-3 text-right">{row.ownerContacts}</td>
+                <td className="px-4 py-3 text-right">{row.fulls}</td>
+                <td className="px-4 py-3 text-right">{row.appointments}</td>
+                <td className="px-4 py-3 text-right">{row.attended}</td>
+                <td className="px-4 py-3 text-right">{row.validMeetings}</td>
+                <td className="px-4 py-3 text-right">{row.won}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.connections, row.calls))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.ownerContacts, row.connections))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.fulls, row.ownerContacts))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.appointments, row.fulls))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.appointments, row.calls))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.validMeetings, row.appointments))}</td>
+                <td className="px-4 py-3 text-right">{formatPercent(rate(row.won, row.validMeetings))}</td>
+                <td className="px-4 py-3 text-right">{formatMoney(row.grossProfit)}</td>
+                <td className="px-4 py-3 text-right">
+                  {row.sampleLow ? (
+                    <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">
+                      参考値
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-green-50 px-2 py-1 text-xs font-bold text-green-700">
+                      通常
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!rows.length ? (
+              <tr>
+                <td className="px-4 py-6 text-sm text-slate-500" colSpan={18}>
+                  この条件で集計できるデータはありません。
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

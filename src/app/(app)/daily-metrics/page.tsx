@@ -67,7 +67,7 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
   });
   const metricDefinitionIds = definitions.map((definition) => definition.id);
   const targetDateValue = dateOnly(targetDate);
-  const [entries, allEntries, expectedMemberships] = await Promise.all([
+  const [entries, allEntries, expectedMemberships, territories, industries, products, campaigns, callLists] = await Promise.all([
     prisma.dailyMetricEntry.findMany({
       where: {
         organizationId: context.organization.id,
@@ -116,6 +116,51 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
           select: { user: { select: { id: true, name: true } } },
         })
       : Promise.resolve([]),
+    prisma.salesTerritory.findMany({
+      where: {
+        organizationId: context.organization.id,
+        isActive: true,
+        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
+      },
+      select: { id: true, name: true },
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.industry.findMany({
+      where: { organizationId: context.organization.id, isActive: true },
+      select: { id: true, name: true },
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.product.findMany({
+      where: { organizationId: context.organization.id, status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.outboundCampaign.findMany({
+      where: {
+        organizationId: context.organization.id,
+        status: "ACTIVE",
+        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.callList.findMany({
+      where: {
+        organizationId: context.organization.id,
+        status: "ACTIVE",
+        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
+      },
+      select: {
+        id: true,
+        name: true,
+        campaignId: true,
+        territoryId: true,
+        prefectureCode: true,
+        industryId: true,
+        productId: true,
+      },
+      orderBy: { name: "asc" },
+    }),
   ]);
   const expectedUsers =
     expectedMemberships.length > 0
@@ -186,6 +231,11 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
         missingUsers={missingUsers}
         approvalEntries={approvalEntries}
         warnings={warnings}
+        territories={territories}
+        industries={industries}
+        products={products}
+        campaigns={campaigns}
+        callLists={callLists}
       />
     </div>
   );

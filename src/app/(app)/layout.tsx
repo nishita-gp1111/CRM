@@ -22,6 +22,15 @@ export default async function ProtectedLayout({
     orderBy: { createdAt: "asc" },
   });
   const businessUnitSelection = await getBusinessUnitSelection(context);
+  const isMembership = await prisma.businessUnitMembership.findFirst({
+    where: {
+      organizationId: context.organization.id,
+      userId: context.user.id,
+      workFunction: "IS",
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
 
   return (
     <div className="min-h-screen">
@@ -33,6 +42,7 @@ export default async function ProtectedLayout({
         businessUnits={businessUnitSelection.units}
         selectedBusinessUnitId={businessUnitSelection.selectedBusinessUnitId}
         canSelectAllBusinessUnits={businessUnitSelection.canSelectAll}
+        showAppointmentCta={Boolean(isMembership)}
       />
       <main className="px-4 pb-28 pt-6 md:px-8 lg:ml-64 lg:pb-12 lg:pt-7">
         {children}

@@ -306,6 +306,15 @@ enum FormStatus {
   @@map("form_status")
 }
 
+enum FormPurpose {
+  PUBLIC_INQUIRY       @map("public_inquiry")
+  PUBLIC_SCHEDULER     @map("public_scheduler")
+  INTERNAL_APPOINTMENT @map("internal_appointment")
+  INTERNAL_HANDOFF     @map("internal_handoff")
+
+  @@map("form_purpose")
+}
+
 enum RoutingRuleStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
@@ -321,6 +330,7 @@ enum RoutingConditionJoin {
 }
 
 enum AssignmentMode {
+  MANUAL           @map("manual")
   FIXED_USER       @map("fixed_user")
   ROUND_ROBIN      @map("round_robin")
   TEAM_ROUND_ROBIN @map("team_round_robin")
@@ -812,6 +822,10 @@ model Organization {
   businessCalendarExceptions BusinessCalendarException[]
   actionPlans                ActionPlan[]
   legacySourceLinks          LegacySourceLink[]
+  salesTerritories           SalesTerritory[]
+  industries                 Industry[]
+  outboundCampaigns          OutboundCampaign[]
+  callLists                  CallList[]
 }
 
 model OrganizationMember {
@@ -1377,6 +1391,13 @@ model MeetingBooking {
   cancelledAt                 DateTime?            @map("cancelled_at") @db.Timestamptz(3)
   noShowAt                    DateTime?            @map("no_show_at") @db.Timestamptz(3)
   sourceChannel               String?              @map("source_channel") @db.VarChar(120)
+  territoryId                 String?              @map("territory_id") @db.Uuid
+  prefectureCode              String?              @map("prefecture_code") @db.VarChar(2)
+  city                        String?              @db.VarChar(120)
+  industryId                  String?              @map("industry_id") @db.Uuid
+  productId                   String?              @map("product_id") @db.Uuid
+  campaignId                  String?              @map("campaign_id") @db.Uuid
+  callListId                  String?              @map("call_list_id") @db.Uuid
   meetingType                 String?              @map("meeting_type") @db.VarChar(120)
   timezone                    String               @default("Asia/Tokyo") @db.VarChar(80)
   idempotencyKey              String?              @map("idempotency_key") @db.VarChar(240)
@@ -1412,6 +1433,12 @@ model MeetingBooking {
   @@index([organizationId, googleCalendarId, googleEventId])
   @@index([organizationId, meetingLinkId, externalSubmissionId])
   @@index([organizationId, dealId])
+  @@index([organizationId, territoryId, startsAt])
+  @@index([organizationId, prefectureCode, startsAt])
+  @@index([organizationId, industryId, startsAt])
+  @@index([organizationId, productId, startsAt])
+  @@index([organizationId, campaignId, startsAt])
+  @@index([organizationId, callListId, startsAt])
   @@map("meeting_bookings")
 }
 
@@ -1423,6 +1450,9 @@ model Form {
   description                    String?
   slug                           String                  @unique @db.VarChar(100)
   status                         FormStatus              @default(DRAFT)
+  formPurpose                    FormPurpose             @default(PUBLIC_INQUIRY) @map("form_purpose")
+  isInternal                     Boolean                 @default(false) @map("is_internal")
+  isDefaultForBusinessUnit       Boolean                 @default(false) @map("is_default_for_business_unit")
   fields                         Json                    @default("[]") @db.JsonB
   mappingSchema                  Json                    @default("{}") @map("mapping_schema") @db.JsonB
   routingConfig                  Json                    @default("{}") @map("routing_config") @db.JsonB
@@ -1451,6 +1481,7 @@ model Form {
   submissions  FormSubmission[]
 
   @@index([organizationId, businessUnitId, status])
+  @@index([organizationId, businessUnitId, formPurpose, isDefaultForBusinessUnit])
   @@map("forms")
 }
 
@@ -1508,6 +1539,7 @@ model FormSubmission {
   @@index([organizationId, formId, createdAt])
   @@index([organizationId, assignedUserId, createdAt])
   @@index([organizationId, dealId])
+  @@unique([organizationId, idempotencyKey])
   @@map("form_submissions")
 }
 
@@ -1946,6 +1978,13 @@ model SalesPerformanceEvent {
   occurredAt         DateTime                    @map("occurred_at") @db.Timestamptz(3)
   quantity           Decimal                     @default(1) @db.Decimal(18, 4)
   amount             Decimal?                    @db.Decimal(18, 2)
+  territoryId        String?                     @map("territory_id") @db.Uuid
+  prefectureCode     String?                     @map("prefecture_code") @db.VarChar(2)
+  city               String?                     @db.VarChar(120)
+  industryId         String?                     @map("industry_id") @db.Uuid
+  productId          String?                     @map("product_id") @db.Uuid
+  campaignId         String?                     @map("campaign_id") @db.Uuid
+  callListId         String?                     @map("call_list_id") @db.Uuid
   idempotencyKey     String                      @map("idempotency_key") @db.VarChar(240)
   metadata           Json                        @default("{}") @db.JsonB
   createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -1958,7 +1997,101 @@ model SalesPerformanceEvent {
   @@index([organizationId, eventType, occurredAt])
   @@index([organizationId, creditedUserId, occurredAt])
   @@index([organizationId, dealId])
+  @@index([organizationId, territoryId, occurredAt])
+  @@index([organizationId, prefectureCode, occurredAt])
+  @@index([organizationId, industryId, occurredAt])
+  @@index([organizationId, productId, occurredAt])
+  @@index([organizationId, campaignId, occurredAt])
+  @@index([organizationId, callListId, occurredAt])
   @@map("sales_performance_events")
+}
+
+model SalesTerritory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  businessUnitId String?  @map("business_unit_id") @db.Uuid
+  name           String   @db.VarChar(160)
+  description    String?
+  mappingRules   Json     @default("[]") @map("mapping_rules") @db.JsonB
+  isActive       Boolean  @default(true) @map("is_active")
+  displayOrder   Int      @default(0) @map("display_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, name])
+  @@index([organizationId, businessUnitId, isActive, displayOrder])
+  @@map("sales_territories")
+}
+
+model Industry {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  parentId       String?   @map("parent_id") @db.Uuid
+  code           String    @db.VarChar(80)
+  name           String    @db.VarChar(160)
+  isActive       Boolean   @default(true) @map("is_active")
+  displayOrder   Int       @default(0) @map("display_order")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       Industry?    @relation("IndustryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Industry[]   @relation("IndustryHierarchy")
+
+  @@unique([organizationId, code])
+  @@index([organizationId, parentId, isActive, displayOrder])
+  @@map("industries")
+}
+
+model OutboundCampaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  businessUnitId String?   @map("business_unit_id") @db.Uuid
+  name           String    @db.VarChar(160)
+  productId      String?   @map("product_id") @db.Uuid
+  territoryId    String?   @map("territory_id") @db.Uuid
+  prefectureCode String?   @map("prefecture_code") @db.VarChar(2)
+  industryId     String?   @map("industry_id") @db.Uuid
+  status         String    @default("ACTIVE") @db.VarChar(40)
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, name])
+  @@index([organizationId, businessUnitId, status])
+  @@index([organizationId, territoryId])
+  @@index([organizationId, industryId])
+  @@map("outbound_campaigns")
+}
+
+model CallList {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  businessUnitId String?  @map("business_unit_id") @db.Uuid
+  campaignId     String?  @map("campaign_id") @db.Uuid
+  name           String   @db.VarChar(160)
+  territoryId    String?  @map("territory_id") @db.Uuid
+  prefectureCode String?  @map("prefecture_code") @db.VarChar(2)
+  industryId     String?  @map("industry_id") @db.Uuid
+  productId      String?  @map("product_id") @db.Uuid
+  recordCount    Int      @default(0) @map("record_count")
+  status         String   @default("ACTIVE") @db.VarChar(40)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, name])
+  @@index([organizationId, businessUnitId, status])
+  @@index([organizationId, campaignId])
+  @@index([organizationId, territoryId])
+  @@index([organizationId, industryId])
+  @@map("call_lists")
 }
 
 model Referral {
@@ -2099,6 +2232,8 @@ model DailyMetricEntry {
   approvedByUserId   String?           @map("approved_by_user_id") @db.Uuid
   lockedAt           DateTime?         @map("locked_at") @db.Timestamptz(3)
   comment            String?
+  dimensions         Json              @default("{}") @db.JsonB
+  dimensionHash      String            @default("default") @map("dimension_hash") @db.VarChar(80)
   metadata           Json              @default("{}") @db.JsonB
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -2109,6 +2244,7 @@ model DailyMetricEntry {
   @@index([organizationId, businessUnitId, targetDate])
   @@index([organizationId, metricDefinitionId, targetDate])
   @@index([organizationId, userId, targetDate])
+  @@unique([organizationId, businessUnitId, userId, workFunction, metricDefinitionId, targetDate, source, dimensionHash])
   @@map("daily_metric_entries")
 }
 

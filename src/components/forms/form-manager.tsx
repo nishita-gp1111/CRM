@@ -36,7 +36,7 @@ type CrmForm = {
   completionMessage: string | null;
   redirectUrl: string | null;
   meetingLinkId?: string | null;
-  assignmentMode?: "FIXED_USER" | "ROUND_ROBIN" | "TEAM_ROUND_ROBIN" | null;
+  assignmentMode?: "FIXED_USER" | "ROUND_ROBIN" | "TEAM_ROUND_ROBIN" | "MANUAL" | null;
   fixedAssigneeUserId?: string | null;
   teamId?: string | null;
   workFunction?: "IS" | "FS" | "CS" | null;

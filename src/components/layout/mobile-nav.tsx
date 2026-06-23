@@ -15,7 +15,13 @@ const items = [
     href: "/reports",
     label: "レポート",
     icon: "reports",
-    activePrefixes: ["/reports", "/daily-metrics"],
+    activePrefixes: ["/reports"],
+  },
+  {
+    href: "/daily-metrics",
+    label: "行動",
+    icon: "tasks",
+    activePrefixes: ["/daily-metrics"],
   },
   {
     href: "/companies",
@@ -28,12 +34,6 @@ const items = [
     label: "商談",
     icon: "deals",
     activePrefixes: ["/deals"],
-  },
-  {
-    href: "/delivery-projects",
-    label: "制作",
-    icon: "tasks",
-    activePrefixes: ["/delivery-projects"],
   },
   {
     href: "/settings",

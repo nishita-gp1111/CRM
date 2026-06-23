@@ -540,6 +540,18 @@ async function main() {
   await prisma.businessUnitProduct.deleteMany({
     where: { organizationId: organization.id },
   });
+  await prisma.callList.deleteMany({
+    where: { organizationId: organization.id },
+  });
+  await prisma.outboundCampaign.deleteMany({
+    where: { organizationId: organization.id },
+  });
+  await prisma.industry.deleteMany({
+    where: { organizationId: organization.id },
+  });
+  await prisma.salesTerritory.deleteMany({
+    where: { organizationId: organization.id },
+  });
   await prisma.product.deleteMany({
     where: { organizationId: organization.id },
   });
@@ -762,6 +774,101 @@ async function main() {
       },
     });
   }
+
+  const territorySeeds = [
+    { name: "東京23区", description: "東京都心部の架電・訪問対象", displayOrder: 1 },
+    { name: "多摩・武蔵野", description: "東京都西部エリア", displayOrder: 2 },
+    { name: "神奈川東部", description: "横浜・川崎周辺", displayOrder: 3 },
+    { name: "関西主要都市", description: "大阪・京都・兵庫の主要商圏", displayOrder: 4 },
+    { name: "九州北部", description: "福岡を中心とした九州北部", displayOrder: 5 },
+  ];
+  const territories = new Map<string, { id: string }>();
+  for (const item of territorySeeds) {
+    const territory = await prisma.salesTerritory.create({
+      data: {
+        organizationId: organization.id,
+        businessUnitId: firstBusinessUnit.id,
+        ...item,
+      },
+      select: { id: true },
+    });
+    territories.set(item.name, territory);
+  }
+
+  const industrySeeds = [
+    { code: "restaurant", name: "飲食店" },
+    { code: "izakaya", name: "居酒屋" },
+    { code: "ramen", name: "ラーメン" },
+    { code: "cafe", name: "カフェ" },
+    { code: "beauty", name: "美容サロン" },
+    { code: "hair", name: "美容室" },
+    { code: "retail", name: "小売" },
+    { code: "medical", name: "医療・クリニック" },
+    { code: "hotel", name: "宿泊・観光" },
+    { code: "other", name: "その他" },
+  ];
+  const industries = new Map<string, { id: string }>();
+  for (const [index, item] of industrySeeds.entries()) {
+    const industry = await prisma.industry.create({
+      data: {
+        organizationId: organization.id,
+        code: item.code,
+        name: item.name,
+        displayOrder: index + 1,
+      },
+      select: { id: true },
+    });
+    industries.set(item.code, industry);
+  }
+
+  const rnProduct = products.get("RN");
+  const menuProduct = products.get("menu");
+  const restaurantIndustry = industries.get("restaurant");
+  const beautyIndustry = industries.get("beauty");
+  const tokyoTerritory = territories.get("東京23区");
+  const kanagawaTerritory = territories.get("神奈川東部");
+  const hdCampaign = await prisma.outboundCampaign.create({
+    data: {
+      organizationId: organization.id,
+      businessUnitId: firstBusinessUnit.id,
+      name: "飲食店向け新規開拓",
+      productId: rnProduct?.id ?? null,
+      territoryId: tokyoTerritory?.id ?? null,
+      prefectureCode: "13",
+      industryId: restaurantIndustry?.id ?? null,
+      status: "ACTIVE",
+      startDate: june2026Start,
+    },
+    select: { id: true },
+  });
+  await prisma.callList.createMany({
+    data: [
+      {
+        organizationId: organization.id,
+        businessUnitId: firstBusinessUnit.id,
+        campaignId: hdCampaign.id,
+        name: "東京23区 飲食店 Aリスト",
+        territoryId: tokyoTerritory?.id ?? null,
+        prefectureCode: "13",
+        industryId: restaurantIndustry?.id ?? null,
+        productId: rnProduct?.id ?? null,
+        recordCount: 120,
+        status: "ACTIVE",
+      },
+      {
+        organizationId: organization.id,
+        businessUnitId: firstBusinessUnit.id,
+        campaignId: hdCampaign.id,
+        name: "神奈川 美容サロン Bリスト",
+        territoryId: kanagawaTerritory?.id ?? null,
+        prefectureCode: "14",
+        industryId: beautyIndustry?.id ?? null,
+        productId: menuProduct?.id ?? null,
+        recordCount: 80,
+        status: "ACTIVE",
+      },
+    ],
+  });
 
   const deliveryPipeline = await prisma.deliveryPipeline.create({
     data: {

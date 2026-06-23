@@ -27,15 +27,17 @@ if (process.env.BOOTSTRAP_DATABASE_ON_BUILD === "true") {
   }
   if (!process.env.MIGRATE_DATABASE_URL && databaseUrl.includes("pooler.supabase.com")) {
     console.error(
-      "Supabase pooler URL detected. Set MIGRATE_DATABASE_URL to the Supabase direct connection URL for migrations and seed.",
+      "Supabase pooler URL detected. Set MIGRATE_DATABASE_URL to a migration-capable Supabase URL.",
     );
     process.exit(1);
   }
   const bootstrapEnv = { ...process.env, DATABASE_URL: databaseUrl };
   console.info("Running production database migrations...");
   run(bin("prisma"), ["migrate", "deploy"], bootstrapEnv);
-  console.info("Running production seed...");
-  run(bin("tsx"), ["prisma/seed.ts"], bootstrapEnv);
+  if (process.env.BOOTSTRAP_SEED_ON_BUILD === "true") {
+    console.info("Running production seed...");
+    run(bin("tsx"), ["prisma/seed.ts"], bootstrapEnv);
+  }
 }
 
 run(bin("prisma"), ["generate"]);

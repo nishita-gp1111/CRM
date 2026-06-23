@@ -19,6 +19,16 @@ type Entry = {
 
 type BusinessUnit = { id: string; name: string };
 type UserOption = { id: string; name: string };
+type DimensionOption = { id: string; name: string };
+type CallListOption = {
+  id: string;
+  name: string;
+  campaignId: string | null;
+  territoryId: string | null;
+  prefectureCode: string | null;
+  industryId: string | null;
+  productId: string | null;
+};
 
 type ApprovalEntry = {
   id: string;
@@ -56,6 +66,11 @@ export function DailyMetricForm({
   missingUsers,
   approvalEntries,
   warnings,
+  territories,
+  industries,
+  products,
+  campaigns,
+  callLists,
 }: {
   definitions: Definition[];
   entries: Entry[];
@@ -70,6 +85,11 @@ export function DailyMetricForm({
   missingUsers: UserOption[];
   approvalEntries: ApprovalEntry[];
   warnings: string[];
+  territories: DimensionOption[];
+  industries: DimensionOption[];
+  products: DimensionOption[];
+  campaigns: DimensionOption[];
+  callLists: CallListOption[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -112,11 +132,21 @@ export function DailyMetricForm({
       value: Number(form.get(definition.id) ?? 0),
       comment: form.get(`${definition.id}:comment`) || null,
     }));
+    const callListId = String(form.get("callListId") ?? "");
+    const selectedCallList = callLists.find((item) => item.id === callListId);
     const ok = await request("/api/daily-metrics", "PUT", {
       businessUnitId: selectedBusinessUnitId,
       workFunction: selectedWorkFunction,
       targetDate,
       userId: canManage ? targetUserId : undefined,
+      dimensions: {
+        territoryId: form.get("territoryId") || selectedCallList?.territoryId || null,
+        prefectureCode: form.get("prefectureCode") || selectedCallList?.prefectureCode || null,
+        industryId: form.get("industryId") || selectedCallList?.industryId || null,
+        productId: form.get("productId") || selectedCallList?.productId || null,
+        campaignId: form.get("campaignId") || selectedCallList?.campaignId || null,
+        callListId: callListId || null,
+      },
       entries: metricEntries,
     });
     if (ok) setMessage("保存しました。");
@@ -210,6 +240,63 @@ export function DailyMetricForm({
                   </span>
                 ) : null}
               </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-5">
+              <label>
+                <span className="field-label">架電リスト</span>
+                <select className="text-field" name="callListId" defaultValue="">
+                  <option value="">なし</option>
+                  {callLists.map((list) => (
+                    <option key={list.id} value={list.id}>
+                      {list.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">営業エリア</span>
+                <select className="text-field" name="territoryId" defaultValue="">
+                  <option value="">未設定</option>
+                  {territories.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">業種</span>
+                <select className="text-field" name="industryId" defaultValue="">
+                  <option value="">未設定</option>
+                  {industries.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">商材</span>
+                <select className="text-field" name="productId" defaultValue="">
+                  <option value="">未設定</option>
+                  {products.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">キャンペーン</span>
+                <select className="text-field" name="campaignId" defaultValue="">
+                  <option value="">未設定</option>
+                  {campaigns.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </section>
 

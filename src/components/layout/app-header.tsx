@@ -9,6 +9,7 @@ type HeaderProps = {
   businessUnits: Array<{ id: string; name: string; slug: string }>;
   selectedBusinessUnitId: string | null;
   canSelectAllBusinessUnits: boolean;
+  showAppointmentCta: boolean;
 };
 
 export function AppHeader({
@@ -18,6 +19,7 @@ export function AppHeader({
   businessUnits,
   selectedBusinessUnitId,
   canSelectAllBusinessUnits,
+  showAppointmentCta,
 }: HeaderProps) {
   const initial =
     user.name.trim().charAt(0) || user.email.charAt(0).toUpperCase();
@@ -42,6 +44,11 @@ export function AppHeader({
         />
       </div>
       <div className="flex items-center gap-3">
+        {showAppointmentCta ? (
+          <Link href="/appointments/new" className="primary-button hidden sm:inline-flex">
+            ＋ アポ登録
+          </Link>
+        ) : null}
         <div className="hidden text-right sm:block">
           <p className="text-sm font-bold">{user.name}</p>
           <p className="text-xs text-slate-500">{user.email}</p>
