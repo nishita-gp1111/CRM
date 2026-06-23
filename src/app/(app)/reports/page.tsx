@@ -337,7 +337,8 @@ export default async function ReportsPage({ searchParams }: Props) {
   const periodStart = one(params.periodStart);
   const periodEnd = one(params.periodEnd);
   const metricId = one(params.metricId);
-  const comparisonMetric = one(params.comparisonMetric) ?? "winRate";
+  const comparisonMetricParam = one(params.comparisonMetric);
+  const comparisonMetric = comparisonMetricParam ?? "winRate";
   const comparisonView = one(params.comparisonView) ?? "table";
   const dealType = one(params.dealType) ?? "ALL";
   const pipelineId = one(params.pipelineId) ?? "";
@@ -620,6 +621,19 @@ export default async function ReportsPage({ searchParams }: Props) {
           selectedWorkFunction={workFunction ?? ""}
           selectedColumns={selectedColumns}
         />
+      ) : null}
+      {tab === "kpi" && comparisonMetricParam ? (
+        <div className="mb-6">
+          <SalespersonComparisonSection
+            data={salespersonComparison}
+            alerts={dealAlerts}
+            baseQuery={baseQuery}
+            selectedMetric={comparisonMetric}
+            selectedView={comparisonView}
+            selectedWorkFunction={workFunction ?? ""}
+            selectedColumns={selectedColumns}
+          />
+        </div>
       ) : null}
       {tab === "territory-analysis" ? (
         <RegionalFunnelSection title="地域分析" rows={territoryFunnel} />
