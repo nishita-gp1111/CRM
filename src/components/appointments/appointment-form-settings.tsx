@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AppointmentFieldDestination,
   AppointmentFormField,
@@ -102,9 +102,12 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
   const [publishedSchema, setPublishedSchema] = useState<AppointmentFormSchema>(emptySchema());
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedKey, setSelectedKey] = useState("businessUnitId");
+  const [search, setSearch] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const centerRef = useRef<HTMLDivElement | null>(null);
   const selectedField = schema.fields.find((field) => field.fieldKey === selectedKey) ?? schema.fields[0];
 
   useEffect(() => {
@@ -118,12 +121,14 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
         setSchema(body.draftSchema);
         setPublishedSchema(body.publishedSchema);
         setVersions(body.versions ?? []);
+        setDirty(false);
       })
       .catch((error) => setMessage(error.message))
       .finally(() => setPending(false));
   }, [businessUnitId]);
 
   function updateField(fieldKey: string, patch: Partial<AppointmentFormField>) {
+    setDirty(true);
     setSchema((current) =>
       ({
         ...current,
@@ -161,17 +166,21 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
       return { ...current, fields: [...current.fields, field] };
     });
     setSelectedKey(field.fieldKey);
+    requestAnimationFrame(() => scrollToField(field.fieldKey));
   }
 
   function addCustomField() {
     const sectionId = schema.sections[0]?.id ?? "owner_company_contact";
     const field = newField(sectionId);
+    setDirty(true);
     setSchema((current) => resequence({ ...current, fields: [...current.fields, field] }));
     setSelectedKey(field.fieldKey);
+    requestAnimationFrame(() => scrollToField(field.fieldKey));
   }
 
   function addSection() {
     const id = `section_${Date.now()}`;
+    setDirty(true);
     setSchema((current) =>
       resequence({
         ...current,
@@ -181,6 +190,7 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
   }
 
   function moveField(fieldKey: string, direction: -1 | 1) {
+    setDirty(true);
     setSchema((current) => {
       const field = current.fields.find((item) => item.fieldKey === fieldKey);
       if (!field) return current;
@@ -201,6 +211,35 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
     });
   }
 
+  function scrollToField(fieldKey: string) {
+    centerRef.current
+      ?.querySelector(`[data-field-key="${fieldKey}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function removeField(fieldKey: string) {
+    const field = schema.fields.find((item) => item.fieldKey === fieldKey);
+    if (!field || field.systemRequired) return;
+    if (!confirm(`${field.label}をフォームから外しますか？`)) return;
+    const peers = sortFields(schema.fields, field.sectionId);
+    const index = peers.findIndex((item) => item.fieldKey === fieldKey);
+    const nextSelected = peers[index - 1]?.fieldKey ?? peers[index + 1]?.fieldKey ?? schema.fields.find((item) => item.fieldKey !== fieldKey)?.fieldKey ?? "";
+    setDirty(true);
+    setSchema((current) =>
+      normalizeRemoved({
+        ...current,
+        fields: current.fields.map((item) =>
+          item.fieldKey === fieldKey ? { ...item, isVisible: false, isEnabled: false } : item,
+        ),
+      }),
+    );
+    setSelectedKey(nextSelected);
+  }
+
+  function normalizeRemoved(next: AppointmentFormSchema) {
+    return { ...next, fields: next.fields };
+  }
+
   async function post(path: string, body: unknown, success: string) {
     setPending(true);
     setMessage("");
@@ -216,13 +255,19 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
       return;
     }
     if (result.draftSchema) setSchema(result.draftSchema);
+    if (success.includes("保存") || success.includes("公開")) setDirty(false);
     setMessage(success);
     const refresh = await fetch(`/api/appointment-form-config?businessUnitId=${businessUnitId}`).then((item) => item.json());
     setVersions(refresh.versions ?? []);
     setPublishedSchema(refresh.publishedSchema);
   }
 
-  const hiddenStandard = schema.fields.filter((field) => !field.isVisible || !field.isEnabled);
+  const hiddenStandard = schema.fields.filter((field) => {
+    if (field.isVisible && field.isEnabled) return false;
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return true;
+    return field.label.toLowerCase().includes(keyword) || field.fieldKey.toLowerCase().includes(keyword);
+  });
 
   return (
     <div className="space-y-5">
@@ -233,7 +278,9 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
             {businessUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
           </select>
         </label>
-        <button className="primary-button" type="button" disabled={pending} onClick={() => post("/api/appointment-form-config", { businessUnitId, formSchema: schema }, "下書きを保存しました。")}>下書き保存</button>
+        <span className={`rounded-full px-3 py-2 text-xs font-bold ${dirty ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+          {dirty ? "未保存の変更あり" : "保存済み"}
+        </span>
         <button className="secondary-button" type="button" disabled={pending} onClick={() => post("/api/appointment-form-config/publish", { businessUnitId }, "公開しました。")}>公開</button>
         <button className="secondary-button" type="button" disabled={pending} onClick={() => post("/api/appointment-form-config/duplicate-published", { businessUnitId }, "公開済みから複製しました。")}>公開済みから複製</button>
         <div className="ml-auto flex rounded-lg border border-slate-200 bg-white p-1">
@@ -245,9 +292,15 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
         </div>
       </div>
       {message ? <p className="rounded-lg bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700">{message}</p> : null}
-      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
-        <aside className="card p-4">
+      <div className="grid items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+        <aside className="card sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto p-4">
           <h2 className="text-sm font-bold text-ink">利用可能な項目</h2>
+          <input
+            className="text-field mt-3"
+            placeholder="項目検索"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
           <div className="mt-3 space-y-2">
             {hiddenStandard.map((field) => (
               <button key={field.fieldKey} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-bold text-slate-600 hover:border-brand-300 hover:bg-brand-50" type="button" onClick={() => addStandard(field)}>
@@ -259,7 +312,7 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
           <button className="primary-button mt-5 w-full" type="button" onClick={addCustomField}>新規項目追加</button>
           <button className="secondary-button mt-2 w-full" type="button" onClick={addSection}>セクション追加</button>
         </aside>
-        <main className={`card p-4 ${previewMode === "mobile" ? "mx-auto w-full max-w-sm" : ""}`}>
+        <main ref={centerRef} className={`card min-w-0 p-4 ${previewMode === "mobile" ? "mx-auto w-full max-w-sm" : ""}`}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-bold text-ink">フォーム構成</h2>
             <span className="text-xs font-bold text-slate-400">下書き編集中</span>
@@ -294,6 +347,7 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
                   {sortFields(schema.fields, section.id).map((field) => (
                     <button
                       key={field.fieldKey}
+                      data-field-key={field.fieldKey}
                       className={`w-full rounded-lg border px-3 py-2 text-left ${selectedKey === field.fieldKey ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white"}`}
                       type="button"
                       onClick={() => setSelectedKey(field.fieldKey)}
@@ -309,7 +363,7 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
             ))}
           </div>
         </main>
-        <aside className="card p-4">
+        <aside className="card sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto p-4">
           <h2 className="text-sm font-bold text-ink">選択中項目の設定</h2>
           {selectedField ? (
             <div className="mt-4 space-y-4">
@@ -359,6 +413,9 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
                 <button className="secondary-button flex-1" type="button" onClick={() => moveField(selectedField.fieldKey, -1)}>上へ</button>
                 <button className="secondary-button flex-1" type="button" onClick={() => moveField(selectedField.fieldKey, 1)}>下へ</button>
               </div>
+              <button className="secondary-button w-full border-red-200 text-red-600" type="button" disabled={selectedField.systemRequired} onClick={() => removeField(selectedField.fieldKey)}>
+                項目を外す
+              </button>
               <label>
                 <span className="field-label">初期値</span>
                 <input className="text-field" value={String(selectedField.defaultValue ?? "")} onChange={(event) => updateField(selectedField.fieldKey, { defaultValue: event.target.value })} />
@@ -405,6 +462,14 @@ export function AppointmentFormSettings({ businessUnits }: { businessUnits: Busi
             </div>
           ) : null}
         </aside>
+      </div>
+      <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-xl border border-line bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+        <span className={`text-sm font-bold ${dirty ? "text-amber-700" : "text-green-700"}`}>
+          {dirty ? "未保存の変更があります" : "下書きは保存済みです"}
+        </span>
+        <button className="primary-button" type="button" disabled={pending || !dirty} onClick={() => post("/api/appointment-form-config", { businessUnitId, formSchema: schema }, "下書きを保存しました。")}>
+          {pending ? "保存中..." : "下書き保存"}
+        </button>
       </div>
     </div>
   );

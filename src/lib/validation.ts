@@ -56,14 +56,19 @@ export const updateMemberSchema = z
 
 export const businessUnitSchema = z.object({
   name: z.string().trim().min(1, "事業部名を入力してください。").max(160),
-  slug: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9][a-z0-9-]*$/,
-      "slugは英小文字・数字・ハイフンで入力してください。",
-    )
-    .max(80),
+  slug: z.preprocess(
+    (value) =>
+      typeof value === "string"
+        ? value.trim().toLowerCase().replace(/-+/g, "-").replace(/^-|-$/g, "")
+        : value,
+    z
+      .string()
+      .regex(
+        /^[a-z0-9][a-z0-9-]*$/,
+        "slugは英小文字・数字・ハイフンで入力してください。",
+      )
+      .max(80),
+  ),
   description: z.preprocess(
     (value) => (value === "" ? null : value),
     z.string().trim().max(1000).nullable().optional(),

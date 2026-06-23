@@ -827,6 +827,7 @@ model Organization {
   industries                 Industry[]
   outboundCampaigns          OutboundCampaign[]
   callLists                  CallList[]
+  appointmentCaptureLinks    AppointmentCaptureLink[]
 }
 
 model OrganizationMember {
@@ -1544,6 +1545,32 @@ model FormSubmission {
   @@index([organizationId, assignedUserId, createdAt])
   @@index([organizationId, dealId])
   @@map("form_submissions")
+}
+
+model AppointmentCaptureLink {
+  id                          String    @id @default(uuid()) @db.Uuid
+  organizationId              String    @map("organization_id") @db.Uuid
+  businessUnitId              String    @map("business_unit_id") @db.Uuid
+  formId                      String?   @map("form_id") @db.Uuid
+  formVersionId               String?   @map("form_version_id") @db.Uuid
+  creditedAppointmentSetterId String    @map("credited_appointment_setter_id") @db.Uuid
+  name                        String    @db.VarChar(160)
+  tokenHash                   String    @unique @map("token_hash") @db.VarChar(64)
+  status                      String    @default("ACTIVE") @db.VarChar(40)
+  expiresAt                   DateTime? @map("expires_at") @db.Timestamptz(3)
+  passcodeHash                String?   @map("passcode_hash")
+  maxSubmissions              Int?      @map("max_submissions")
+  submissionCount             Int       @default(0) @map("submission_count")
+  createdByUserId             String    @map("created_by_user_id") @db.Uuid
+  lastUsedAt                  DateTime? @map("last_used_at") @db.Timestamptz(3)
+  createdAt                   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, businessUnitId, status])
+  @@index([organizationId, creditedAppointmentSetterId, status])
+  @@map("appointment_capture_links")
 }
 
 model RoutingRule {

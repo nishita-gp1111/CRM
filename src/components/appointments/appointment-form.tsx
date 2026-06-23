@@ -77,6 +77,8 @@ export function AppointmentForm({
   callLists,
   companies,
   formConfigs,
+  submitEndpoint = "/api/appointments",
+  passcodeRequired = false,
 }: {
   businessUnits: Option[];
   selectedBusinessUnitId: string;
@@ -90,6 +92,8 @@ export function AppointmentForm({
   callLists: CallListOption[];
   companies: Option[];
   formConfigs: AppointmentFormConfig[];
+  submitEndpoint?: string;
+  passcodeRequired?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -139,6 +143,7 @@ export function AppointmentForm({
     const body = {
       idempotencyKey: value(form, "idempotencyKey"),
       formVersionId: currentConfig?.formVersionId,
+      passcode: value(form, "passcode"),
       businessUnitId,
       appointmentSetterUserId,
       assignedFsUserId,
@@ -212,7 +217,7 @@ export function AppointmentForm({
     setPending(true);
     setError("");
     setCreated(null);
-    const response = await fetch("/api/appointments", {
+    const response = await fetch(submitEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -399,6 +404,14 @@ export function AppointmentForm({
             {created.meetingBookingId ? <Link className="underline" href="/meetings">予約一覧</Link> : null}
           </div>
         </div>
+      ) : null}
+      {passcodeRequired ? (
+        <section className="card p-5">
+          <label>
+            <span className="field-label">パスコード</span>
+            <input className="text-field" name="passcode" type="password" required />
+          </label>
+        </section>
       ) : null}
 
       {(currentSchema?.sections ?? []).sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => {

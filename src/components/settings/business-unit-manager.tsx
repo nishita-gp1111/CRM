@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type BusinessUnit = {
@@ -28,11 +28,20 @@ export function BusinessUnitManager({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<BusinessUnit | null>(null);
+  const [items, setItems] = useState(businessUnits);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    setItems(businessUnits);
+  }, [businessUnits]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    if (pending) return;
+    const formElement = event.currentTarget;
+    const data = new FormData(formElement);
     const payload = {
       name: data.get("name"),
       slug: data.get("slug"),
@@ -42,21 +51,42 @@ export function BusinessUnitManager({
       amountMetricBasis: data.get("amountMetricBasis") || null,
       confirmedAmountDateBasis: data.get("confirmedAmountDateBasis") || null,
     };
-    const response = await fetch(
-      editing ? `/api/business-units/${editing.id}` : "/api/business-units",
-      {
-        method: editing ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    const result = await response.json();
-    if (!response.ok)
-      return setError(result.message ?? "保存できませんでした。");
-    setEditing(null);
+    setPending(true);
     setError("");
-    event.currentTarget.reset();
-    router.refresh();
+    setFieldErrors({});
+    try {
+      const response = await fetch(
+        editing ? `/api/business-units/${editing.id}` : "/api/business-units",
+        {
+          method: editing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setFieldErrors(result.fieldErrors ?? {});
+        setError(result.message ?? "保存できませんでした。");
+        return;
+      }
+      if (result.item) {
+        setItems((current) => {
+          const next = editing
+            ? current.map((item) => (item.id === result.item.id ? result.item : item))
+            : [result.item, ...current];
+          return next.sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name, "ja"));
+        });
+      }
+      setEditing(null);
+      setError("");
+      setFieldErrors({});
+      formElement.reset();
+      router.refresh();
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "保存できませんでした。");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -95,7 +125,9 @@ export function BusinessUnitManager({
                 name="name"
                 defaultValue={editing?.name}
                 required
+                aria-invalid={Boolean(fieldErrors.name)}
               />
+              {fieldErrors.name ? <p className="mt-1 text-xs font-bold text-red-600">{fieldErrors.name}</p> : null}
             </label>
             <label>
               <span className="field-label">slug</span>
@@ -105,7 +137,9 @@ export function BusinessUnitManager({
                 defaultValue={editing?.slug}
                 pattern="[a-z0-9][a-z0-9-]*"
                 required
+                aria-invalid={Boolean(fieldErrors.slug)}
               />
+              {fieldErrors.slug ? <p className="mt-1 text-xs font-bold text-red-600">{fieldErrors.slug}</p> : null}
             </label>
             <label>
               <span className="field-label">説明</span>
@@ -164,8 +198,8 @@ export function BusinessUnitManager({
                 </select>
               </label>
             </div>
-            <button className="primary-button w-full">
-              {editing ? "保存" : "追加"}
+            <button className="primary-button w-full" disabled={pending}>
+              {pending ? (editing ? "保存中..." : "追加中...") : editing ? "保存" : "追加"}
             </button>
           </div>
         </form>
@@ -179,11 +213,16 @@ export function BusinessUnitManager({
           </p>
         </div>
         <div className="divide-y divide-line">
-          {businessUnits.map((unit) => (
+          {items.map((unit) => (
             <button
               key={unit.id}
               type="button"
-              onClick={() => canManage && setEditing(unit)}
+              onClick={() => {
+                if (!canManage || pending) return;
+                setEditing(unit);
+                setError("");
+                setFieldErrors({});
+              }}
               className="grid w-full gap-2 px-5 py-4 text-left transition hover:bg-brand-50/50 md:grid-cols-[1fr_auto]"
             >
               <div>
