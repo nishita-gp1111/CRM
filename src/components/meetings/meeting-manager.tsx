@@ -34,6 +34,9 @@ type BookingItem = {
   externalChangeType: string | null;
   externalSyncStatus: string | null;
   externalChangeDetectedAt: string | null;
+  attendedAt: string | null;
+  noShowAt: string | null;
+  cancelledAt: string | null;
   googleEventHtmlLink: string | null;
   meetingLink: { name: string };
   contact: { firstName: string | null; lastName: string | null; email: string | null } | null;
@@ -141,6 +144,9 @@ export function MeetingManager({
     setError("");
     setMessage("処理を実行しました。");
     router.refresh();
+  }
+  async function submitBookingResult(bookingId: string, result: string) {
+    await postAction(`/api/bookings/${bookingId}/result`, { result });
   }
   async function testGoogleCalendarConnection() {
     setGoogleCalendarTestPending(true);
@@ -454,6 +460,27 @@ export function MeetingManager({
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        className="secondary-button py-2 text-xs"
+                        type="button"
+                        onClick={() => submitBookingResult(booking.id, "ATTENDED_VALID")}
+                      >
+                        出席/有効
+                      </button>
+                      <button
+                        className="secondary-button py-2 text-xs"
+                        type="button"
+                        onClick={() => submitBookingResult(booking.id, "ATTENDED_INVALID")}
+                      >
+                        出席/無効
+                      </button>
+                      <button
+                        className="secondary-button py-2 text-xs"
+                        type="button"
+                        onClick={() => submitBookingResult(booking.id, "NO_SHOW")}
+                      >
+                        欠席
+                      </button>
                       <button className="secondary-button py-2 text-xs" type="button" onClick={() => postAction(`/api/bookings/${booking.id}/sync`)}>
                         再同期
                       </button>

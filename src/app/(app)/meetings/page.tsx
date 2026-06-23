@@ -96,6 +96,9 @@ export default async function MeetingsPage() {
           externalSyncStatus: booking.externalSyncStatus,
           externalChangeDetectedAt:
             booking.externalChangeDetectedAt?.toISOString() ?? null,
+          attendedAt: booking.attendedAt?.toISOString() ?? null,
+          noShowAt: booking.noShowAt?.toISOString() ?? null,
+          cancelledAt: booking.cancelledAt?.toISOString() ?? null,
           googleEventHtmlLink: booking.googleEventHtmlLink,
           meetingLink: booking.meetingLink,
           contact: booking.contact,
