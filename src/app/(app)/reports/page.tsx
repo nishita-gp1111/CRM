@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DealType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ActionPlanPanel } from "@/components/kpi/action-plan-panel";
+import { DrilldownSheet } from "@/components/reports/drilldown-sheet";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
 import { getBusinessUnitSelection } from "@/lib/business-units";
@@ -341,6 +342,11 @@ export default async function ReportsPage({ searchParams }: Props) {
   const dealType = one(params.dealType) ?? "ALL";
   const pipelineId = one(params.pipelineId) ?? "";
   const source = one(params.source) ?? "";
+  const selectedColumns = Array.isArray(params.columns)
+    ? params.columns
+    : typeof params.columns === "string"
+      ? [params.columns]
+      : ["opportunityCount", "wonDealCount", "lostDealCount", "winRate", "grossProfitAmount", "currentAttainmentRate", "landingForecastAmount"];
   const baseQuery = {
     businessUnitId,
     workFunction,
@@ -612,6 +618,7 @@ export default async function ReportsPage({ searchParams }: Props) {
           selectedMetric={comparisonMetric}
           selectedView={comparisonView}
           selectedWorkFunction={workFunction ?? ""}
+          selectedColumns={selectedColumns}
         />
       ) : null}
       {tab === "territory-analysis" ? (
@@ -1382,6 +1389,7 @@ function SalespersonComparisonSection({
   selectedMetric,
   selectedView,
   selectedWorkFunction,
+  selectedColumns,
 }: {
   data: SalespersonComparisonData;
   alerts: Awaited<ReturnType<typeof getDealQualityAlerts>>;
@@ -1389,6 +1397,7 @@ function SalespersonComparisonSection({
   selectedMetric: string;
   selectedView: string;
   selectedWorkFunction: string;
+  selectedColumns: string[];
 }) {
   const metricOptions = [
     ["opportunityCount", "商談数"],
@@ -1454,6 +1463,16 @@ function SalespersonComparisonSection({
     return (metricValue(b) ?? -1) - (metricValue(a) ?? -1);
   });
   const maxMetric = Math.max(1, ...rankedRows.map((row) => metricValue(row) ?? 0));
+  const visible = (key: string) => selectedColumns.includes(key);
+  const drillEndpoint = (
+    row: SalespersonComparisonData["rows"][number],
+    subject: string,
+  ) =>
+    `/api/reports/salesperson-comparison/drilldown?${queryString(baseQuery, {
+      userId: row.userId ?? "",
+      businessUnitId: row.businessUnitId ?? baseQuery.businessUnitId,
+      subject,
+    })}`;
   return (
     <div className="space-y-6">
       <section className="card overflow-hidden">
@@ -1487,6 +1506,42 @@ function SalespersonComparisonSection({
           <p className="mt-1 text-sm text-slate-500">
             担当者別金額はCLOSERのcreditShareで配賦しています。
           </p>
+          <details className="mt-4 rounded-lg border border-line bg-white p-4">
+            <summary className="cursor-pointer text-sm font-bold text-slate-600">
+              表示項目
+            </summary>
+            <form className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(baseQuery).map(([key, value]) =>
+                key === "columns" || !value ? null : (
+                  <input key={key} type="hidden" name={key} value={value} />
+                ),
+              )}
+              <input type="hidden" name="tab" value="salesperson-comparison" />
+              {[
+                ["opportunityCount", "商談数"],
+                ["wonDealCount", "受注件数"],
+                ["lostDealCount", "失注件数"],
+                ["winRate", "受注率"],
+                ["grossProfitAmount", "受注粗利"],
+                ["currentAttainmentRate", "達成率"],
+                ["landingForecastAmount", "着地見込"],
+                ["averageGrossProfitAmount", "平均粗利"],
+              ].map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    name="columns"
+                    value={key}
+                    defaultChecked={selectedColumns.includes(key)}
+                  />
+                  {label}
+                </label>
+              ))}
+              <div className="sm:col-span-2 lg:col-span-4">
+                <button className="secondary-button">表示を更新</button>
+              </div>
+            </form>
+          </details>
         </div>
         {selectedView === "ranking" ? (
           <div className="divide-y divide-line">
@@ -1550,13 +1605,13 @@ function SalespersonComparisonSection({
               <tr>
                 {[
                   "担当者",
-                  "商談",
-                  "受注",
-                  "失注",
-                  "受注率",
-                  "受注粗利",
-                  "達成率",
-                  "着地見込",
+                  ...(visible("opportunityCount") ? ["商談"] : []),
+                  ...(visible("wonDealCount") ? ["受注"] : []),
+                  ...(visible("lostDealCount") ? ["失注"] : []),
+                  ...(visible("winRate") ? ["受注率"] : []),
+                  ...(visible("grossProfitAmount") ? ["受注粗利"] : []),
+                  ...(visible("currentAttainmentRate") ? ["達成率"] : []),
+                  ...(visible("landingForecastAmount") ? ["着地見込"] : []),
                   metricLabel,
                 ].map((label) => (
                   <th
@@ -1582,16 +1637,37 @@ function SalespersonComparisonSection({
                       {row.label}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {row.opportunityCount.toLocaleString("ja-JP")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {row.wonDealCount.toLocaleString("ja-JP")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {row.lostDealCount.toLocaleString("ja-JP")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  {visible("opportunityCount") ? <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{row.opportunityCount.toLocaleString("ja-JP")}</span>
+                      <DrilldownSheet
+                        label="明細"
+                        title={`${row.label} 商談数`}
+                        endpoint={drillEndpoint(row, "opportunity")}
+                      />
+                    </div>
+                  </td> : null}
+                  {visible("wonDealCount") ? <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{row.wonDealCount.toLocaleString("ja-JP")}</span>
+                      <DrilldownSheet
+                        label="明細"
+                        title={`${row.label} 受注商談`}
+                        endpoint={drillEndpoint(row, "won")}
+                      />
+                    </div>
+                  </td> : null}
+                  {visible("lostDealCount") ? <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{row.lostDealCount.toLocaleString("ja-JP")}</span>
+                      <DrilldownSheet
+                        label="明細"
+                        title={`${row.label} 失注商談`}
+                        endpoint={drillEndpoint(row, "lost")}
+                      />
+                    </div>
+                  </td> : null}
+                  {visible("winRate") ? <td className="px-4 py-3 text-right">
                     <div className="font-semibold">{formatPercent(row.winRate)}</div>
                     <div className="text-xs text-slate-400">
                       {row.winRateDenominator
@@ -1599,16 +1675,23 @@ function SalespersonComparisonSection({
                         : "分母なし"}
                       {row.winRateLowSample ? " ・ 参考値" : ""}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {formatMoney(row.grossProfitAmount)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  </td> : null}
+                  {visible("grossProfitAmount") ? <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{formatMoney(row.grossProfitAmount)}</span>
+                      <DrilldownSheet
+                        label="明細"
+                        title={`${row.label} 受注粗利`}
+                        endpoint={drillEndpoint(row, "grossProfit")}
+                      />
+                    </div>
+                  </td> : null}
+                  {visible("currentAttainmentRate") ? <td className="px-4 py-3 text-right">
                     {formatPercent(row.currentAttainmentRate)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  </td> : null}
+                  {visible("landingForecastAmount") ? <td className="px-4 py-3 text-right">
                     {formatMoney(row.landingForecastAmount)}
-                  </td>
+                  </td> : null}
                   <td className="px-4 py-3 text-right">
                     {formatMetric(row)}
                   </td>

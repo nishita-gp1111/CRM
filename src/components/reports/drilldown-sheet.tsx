@@ -8,6 +8,12 @@ type DrilldownItem = {
   name: string;
   href?: string;
   status?: string;
+  companyName?: string | null;
+  ownerName?: string | null;
+  stageName?: string | null;
+  amount?: number | null;
+  grossProfitAmount?: number | null;
+  occurredAt?: string | null;
   expectedPublishDate?: string | null;
   nextAction?: string | null;
   blocker?: string | null;
@@ -51,12 +57,17 @@ export function DrilldownSheet({
   function exportCsv() {
     const rows = data?.items ?? [];
     const csv = [
-      ["id", "name", "status", "expectedPublishDate", "nextAction", "blocker"],
+      ["id", "name", "company", "owner", "stage", "status", "amount", "grossProfit", "date", "nextAction", "blocker"],
       ...rows.map((row) => [
         row.id,
         row.name,
+        row.companyName ?? "",
+        row.ownerName ?? "",
+        row.stageName ?? "",
         row.status ?? "",
-        row.expectedPublishDate ?? "",
+        row.amount ?? "",
+        row.grossProfitAmount ?? "",
+        row.occurredAt ?? row.expectedPublishDate ?? "",
         row.nextAction ?? "",
         row.blocker ?? "",
       ]),
@@ -132,7 +143,10 @@ export function DrilldownSheet({
                             <p className="font-bold text-ink">{item.name}</p>
                           )}
                           <p className="mt-1 text-xs text-slate-500">
-                            {item.status ?? "-"} / {item.expectedPublishDate?.slice(0, 10) ?? "日付なし"}
+                            {item.companyName ?? "会社未設定"} / {item.ownerName ?? "担当未設定"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {item.stageName ?? item.status ?? "-"} / {(item.occurredAt ?? item.expectedPublishDate)?.slice(0, 10) ?? "日付なし"}
                           </p>
                         </div>
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
@@ -141,6 +155,11 @@ export function DrilldownSheet({
                       </div>
                       {item.nextAction ? (
                         <p className="mt-3 text-sm text-slate-600">{item.nextAction}</p>
+                      ) : null}
+                      {item.amount || item.grossProfitAmount ? (
+                        <p className="mt-2 text-xs font-semibold text-slate-500">
+                          金額 {Number(item.amount ?? 0).toLocaleString("ja-JP")}円 / 粗利 {Number(item.grossProfitAmount ?? 0).toLocaleString("ja-JP")}円
+                        </p>
                       ) : null}
                       {item.blocker ? (
                         <p className="mt-2 text-sm font-semibold text-red-700">{item.blocker}</p>

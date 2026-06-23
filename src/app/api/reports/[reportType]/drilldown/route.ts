@@ -1,4 +1,4 @@
-import { DealLineItemStatus } from "@prisma/client";
+import { DealLineItemStatus, DealParticipantRole, DealStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
@@ -24,6 +24,89 @@ export async function GET(request: Request, { params }: Params) {
     const subject = url.searchParams.get("subject");
     const ruleId = url.searchParams.get("ruleId");
     const reasonId = url.searchParams.get("reasonId");
+    const userId = url.searchParams.get("userId");
+
+    if (reportType === "salesperson-comparison") {
+      const dealWhere = {
+        organizationId: context.organization.id,
+        deletedAt: null,
+        ...(query.businessUnitId ? { businessUnitId: query.businessUnitId } : {}),
+        ...(query.pipelineId ? { pipelineId: query.pipelineId } : {}),
+        ...(query.source ? { source: query.source } : {}),
+        ...(query.dealType && query.dealType !== "ALL" ? { dealType: query.dealType } : {}),
+        ...(subject === "won" || subject === "amount" || subject === "grossProfit"
+          ? { status: DealStatus.WON }
+          : subject === "lost"
+            ? { status: DealStatus.LOST }
+            : {}),
+      };
+      const deals = await prisma.deal.findMany({
+        where: dealWhere,
+        include: {
+          stage: { select: { name: true } },
+          owner: { select: { id: true, name: true } },
+          participants: {
+            where: { role: DealParticipantRole.CLOSER, status: "ACTIVE" },
+            select: { userId: true, snapshotUserName: true },
+          },
+          lineItems: {
+            select: {
+              revenueAmount: true,
+              grossProfitAmount: true,
+              expectedRevenueAmount: true,
+              expectedGrossProfitAmount: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 300,
+      });
+      const items = deals
+        .filter((deal) => {
+          const date =
+            subject === "won" || subject === "amount" || subject === "grossProfit"
+              ? deal.wonAt ?? deal.closeDate
+              : subject === "lost"
+                ? deal.lostAt ?? deal.closeDate
+                : deal.createdAt;
+          if (!date) return false;
+          if (date < periodStart || date > periodEnd) return false;
+          if (!userId) return true;
+          const closerIds = deal.participants.map((participant) => participant.userId).filter(Boolean);
+          return closerIds.length ? closerIds.includes(userId) : deal.ownerUserId === userId;
+        })
+        .slice(0, 100)
+        .map((deal) => ({
+          id: deal.id,
+          name: deal.name,
+          href: `/deals/${deal.id}`,
+          status: deal.status,
+          companyName: null,
+          ownerName: deal.owner?.name ?? deal.participants[0]?.snapshotUserName ?? null,
+          stageName: deal.stage.name,
+          amount: deal.lineItems.reduce(
+            (sum, line) =>
+              sum +
+              Number(line.revenueAmount ?? line.expectedRevenueAmount ?? 0),
+            0,
+          ),
+          grossProfitAmount: deal.lineItems.reduce(
+            (sum, line) =>
+              sum +
+              Number(line.grossProfitAmount ?? line.expectedGrossProfitAmount ?? 0),
+            0,
+          ),
+          occurredAt:
+            (subject === "won" || subject === "amount" || subject === "grossProfit"
+              ? deal.wonAt ?? deal.closeDate
+              : subject === "lost"
+                ? deal.lostAt ?? deal.closeDate
+                : deal.createdAt
+            )?.toISOString() ?? null,
+          nextAction: deal.nextAction,
+        }));
+      return NextResponse.json({ total: items.length, items });
+    }
 
     if (reportType === "attachment-rates" && ruleId) {
       const rule = await prisma.productAttachmentRule.findFirst({
