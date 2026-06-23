@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DealType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ActionPlanPanel } from "@/components/kpi/action-plan-panel";
 import { PageHeading } from "@/components/ui/page-heading";
@@ -15,6 +16,7 @@ import {
   getProductPerformanceReport,
   getSalesProgressReport,
   getSalespersonComparisonReport,
+  type SalesReportFilter,
 } from "@/lib/sales-ops";
 
 type Props = {
@@ -334,12 +336,22 @@ export default async function ReportsPage({ searchParams }: Props) {
   const periodStart = one(params.periodStart);
   const periodEnd = one(params.periodEnd);
   const metricId = one(params.metricId);
+  const comparisonMetric = one(params.comparisonMetric) ?? "winRate";
+  const comparisonView = one(params.comparisonView) ?? "table";
+  const dealType = one(params.dealType) ?? "ALL";
+  const pipelineId = one(params.pipelineId) ?? "";
+  const source = one(params.source) ?? "";
   const baseQuery = {
     businessUnitId,
     workFunction,
     userId,
     periodStart,
     periodEnd,
+    comparisonMetric,
+    comparisonView,
+    dealType,
+    pipelineId,
+    source,
   };
   const members = await prisma.organizationMember.findMany({
     where: { organizationId: context.organization.id, status: "ACTIVE" },
@@ -366,9 +378,18 @@ export default async function ReportsPage({ searchParams }: Props) {
         periodEnd: jstDayEnd(data.filters.periodEnd),
       })
     : null;
-  const reportFilter = {
+  const reportFilter: SalesReportFilter = {
     businessUnitId: businessUnitId || null,
     userId: userId || null,
+    workFunction: workFunction || null,
+    dealType:
+      dealType === "CROSS_SELL"
+        ? DealType.CROSS_SELL
+        : dealType === "NEW_BUSINESS"
+          ? DealType.NEW_BUSINESS
+          : null,
+    pipelineId: pipelineId || null,
+    source: source || null,
     periodStart: jstDateOnly(data.filters.periodStart),
     periodEnd: jstDayEnd(data.filters.periodEnd),
   };
@@ -534,6 +555,38 @@ export default async function ReportsPage({ searchParams }: Props) {
             defaultValue={data.filters.periodEnd}
           />
         </label>
+        <label>
+          <span className="field-label">商談種別</span>
+          <select className="text-field" name="dealType" defaultValue={dealType}>
+            <option value="ALL">すべて</option>
+            <option value="NEW_BUSINESS">新規商談</option>
+            <option value="CROSS_SELL">クロスセル</option>
+          </select>
+        </label>
+        <label>
+          <span className="field-label">集計指標</span>
+          <select className="text-field" name="comparisonMetric" defaultValue={comparisonMetric}>
+            <option value="opportunityCount">商談数</option>
+            <option value="wonDealCount">受注件数</option>
+            <option value="lostDealCount">失注件数</option>
+            <option value="winRate">受注率</option>
+            <option value="revenueAmount">受注金額</option>
+            <option value="grossProfitAmount">受注粗利</option>
+            <option value="landingForecastAmount">着地見込</option>
+            <option value="currentAttainmentRate">目標達成率</option>
+            <option value="appointments">アポ数</option>
+            <option value="validMeetings">有効商談数</option>
+            <option value="crossSellWonCount">クロスセル受注数</option>
+          </select>
+        </label>
+        <label>
+          <span className="field-label">表示</span>
+          <select className="text-field" name="comparisonView" defaultValue={comparisonView}>
+            <option value="table">比較テーブル</option>
+            <option value="ranking">ランキング</option>
+            <option value="bar">棒グラフ</option>
+          </select>
+        </label>
         <div className="flex items-end">
           <button className="primary-button w-full">更新</button>
         </div>
@@ -555,6 +608,10 @@ export default async function ReportsPage({ searchParams }: Props) {
         <SalespersonComparisonSection
           data={salespersonComparison}
           alerts={dealAlerts}
+          baseQuery={baseQuery}
+          selectedMetric={comparisonMetric}
+          selectedView={comparisonView}
+          selectedWorkFunction={workFunction ?? ""}
         />
       ) : null}
       {tab === "territory-analysis" ? (
@@ -1321,32 +1378,186 @@ function LossAnalysisSection({
 function SalespersonComparisonSection({
   data,
   alerts,
+  baseQuery,
+  selectedMetric,
+  selectedView,
+  selectedWorkFunction,
 }: {
   data: SalespersonComparisonData;
   alerts: Awaited<ReturnType<typeof getDealQualityAlerts>>;
+  baseQuery: Record<string, string | null | undefined>;
+  selectedMetric: string;
+  selectedView: string;
+  selectedWorkFunction: string;
 }) {
+  const metricOptions = [
+    ["opportunityCount", "商談数"],
+    ["wonDealCount", "受注件数"],
+    ["lostDealCount", "失注件数"],
+    ["winRate", "受注率"],
+    ["revenueAmount", "受注金額"],
+    ["grossProfitAmount", "受注粗利"],
+    ["averageRevenueAmount", "平均受注単価"],
+    ["averageGrossProfitAmount", "平均受注粗利"],
+    ["landingForecastAmount", "着地見込"],
+    ["currentAttainmentRate", "目標達成率"],
+    ...(selectedWorkFunction === "IS" || !selectedWorkFunction
+      ? [
+          ["calls", "架電数"],
+          ["connections", "接続数"],
+          ["ownerContacts", "オーナー接続数"],
+          ["fulls", "フル数"],
+          ["appointments", "アポ数"],
+        ]
+      : []),
+    ...(selectedWorkFunction === "FS" || !selectedWorkFunction
+      ? [
+          ["attendedMeetings", "出席数"],
+          ["validMeetings", "有効商談数"],
+          ["invalidMeetings", "無効商談数"],
+          ["validMeetingWinRate", "有効商談→受注率"],
+          ["appointmentWinRate", "アポ→受注率"],
+        ]
+      : []),
+    ...(selectedWorkFunction === "CS" || !selectedWorkFunction
+      ? [
+          ["crossSellCreatedCount", "クロスセル創出数"],
+          ["crossSellDealCount", "クロスセル商談数"],
+          ["crossSellWonCount", "クロスセル受注数"],
+          ["crossSellGrossProfitAmount", "クロスセル粗利"],
+        ]
+      : []),
+  ] as const;
+  const metricLabel =
+    metricOptions.find(([key]) => key === selectedMetric)?.[1] ?? "受注率";
+  const metricValue = (row: SalespersonComparisonData["rows"][number]) => {
+    const value = row[selectedMetric as keyof typeof row];
+    return typeof value === "number" ? value : null;
+  };
+  const formatMetric = (row: SalespersonComparisonData["rows"][number]) => {
+    const value = metricValue(row);
+    if (selectedMetric.includes("Rate")) return formatPercent(value);
+    if (selectedMetric === "winRate") return formatPercent(row.winRate);
+    if (
+      selectedMetric.includes("Amount") ||
+      selectedMetric === "landingForecastAmount"
+    ) {
+      return formatMoney(value);
+    }
+    return value === null || value === undefined ? "-" : value.toLocaleString("ja-JP");
+  };
+  const rankedRows = [...data.rows].sort((a, b) => {
+    if (selectedMetric === "winRate") {
+      if (a.winRateDenominator === 0 && b.winRateDenominator > 0) return 1;
+      if (b.winRateDenominator === 0 && a.winRateDenominator > 0) return -1;
+    }
+    return (metricValue(b) ?? -1) - (metricValue(a) ?? -1);
+  });
+  const maxMetric = Math.max(1, ...rankedRows.map((row) => metricValue(row) ?? 0));
   return (
     <div className="space-y-6">
       <section className="card overflow-hidden">
         <div className="border-b border-line p-5">
-          <h2 className="font-bold">営業担当比較</h2>
+          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+            <div>
+              <h2 className="font-bold">営業担当比較</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {data.winRateDefinition}。分母0は「-」、分母5件未満は参考値として表示します。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["table", "比較テーブル"],
+                ["ranking", "ランキング"],
+                ["bar", "棒グラフ"],
+              ].map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={`/reports?${queryString(baseQuery, {
+                    tab: "salesperson-comparison",
+                    comparisonView: key,
+                  })}`}
+                  className={selectedView === key ? "primary-button" : "secondary-button"}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
           <p className="mt-1 text-sm text-slate-500">
             担当者別金額はCLOSERのcreditShareで配賦しています。
           </p>
         </div>
-        <div className="overflow-x-auto">
+        {selectedView === "ranking" ? (
+          <div className="divide-y divide-line">
+            {rankedRows.map((row, index) => (
+              <Link
+                key={row.id}
+                href={`/reports?${queryString(baseQuery, {
+                  tab: "salesperson-comparison",
+                  userId: row.userId ?? "",
+                })}`}
+                className="flex items-center justify-between gap-4 p-4 hover:bg-brand-50"
+              >
+                <div>
+                  <p className="text-xs font-bold text-slate-400">#{index + 1}</p>
+                  <p className="font-semibold">{row.label}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">{metricLabel}</p>
+                  <p className="font-bold">{formatMetric(row)}</p>
+                  {selectedMetric === "winRate" ? (
+                    <p className="text-xs text-slate-400">
+                      {row.winRateNumerator}件 / {row.winRateDenominator}件
+                      {row.winRateLowSample ? " ・ 参考値" : ""}
+                    </p>
+                  ) : null}
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : selectedView === "bar" ? (
+          <div className="space-y-4 p-5">
+            {rankedRows.map((row) => (
+              <div key={row.id}>
+                <div className="mb-2 flex justify-between text-sm">
+                  <Link
+                    href={`/reports?${queryString(baseQuery, {
+                      tab: "salesperson-comparison",
+                      userId: row.userId ?? "",
+                    })}`}
+                    className="font-semibold text-brand-700 hover:underline"
+                  >
+                    {row.label}
+                  </Link>
+                  <span>{formatMetric(row)}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className="h-2 rounded-full bg-brand-600"
+                    style={{
+                      width: `${Math.max(((metricValue(row) ?? 0) / maxMetric) * 100, metricValue(row) ? 5 : 0)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] text-left text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 {[
                   "担当者",
-                  "目標",
-                  "確定",
-                  "達成率",
-                  "進捗差",
-                  "着地見込",
-                  "着地差",
+                  "商談",
+                  "受注",
+                  "失注",
                   "受注率",
+                  "受注粗利",
+                  "達成率",
+                  "着地見込",
+                  metricLabel,
                 ].map((label) => (
                   <th
                     key={label}
@@ -1360,37 +1571,53 @@ function SalespersonComparisonSection({
             <tbody className="divide-y divide-line">
               {data.rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="px-4 py-3 font-semibold">{row.label}</td>
-                  <td className="px-4 py-3 text-right">
-                    {formatMoney(row.targetAmount)}
+                  <td className="px-4 py-3 font-semibold">
+                    <Link
+                      href={`/reports?${queryString(baseQuery, {
+                        tab: "salesperson-comparison",
+                        userId: row.userId ?? "",
+                      })}`}
+                      className="text-brand-700 hover:underline"
+                    >
+                      {row.label}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {formatMoney(row.confirmedAmount)}
+                    {row.opportunityCount.toLocaleString("ja-JP")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {row.wonDealCount.toLocaleString("ja-JP")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {row.lostDealCount.toLocaleString("ja-JP")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="font-semibold">{formatPercent(row.winRate)}</div>
+                    <div className="text-xs text-slate-400">
+                      {row.winRateDenominator
+                        ? `${row.winRateNumerator}件 / ${row.winRateDenominator}件`
+                        : "分母なし"}
+                      {row.winRateLowSample ? " ・ 参考値" : ""}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {formatMoney(row.grossProfitAmount)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {formatPercent(row.currentAttainmentRate)}
                   </td>
-                  <td
-                    className={`px-4 py-3 text-right ${signedClass(row.progressGap)}`}
-                  >
-                    {formatMoney(row.progressGap)}
-                  </td>
                   <td className="px-4 py-3 text-right">
                     {formatMoney(row.landingForecastAmount)}
                   </td>
-                  <td
-                    className={`px-4 py-3 text-right ${signedClass(row.landingGap)}`}
-                  >
-                    {formatMoney(row.landingGap)}
-                  </td>
                   <td className="px-4 py-3 text-right">
-                    {formatPercent(row.winRate)}
+                    {formatMetric(row)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </section>
       <section className="card p-5">
         <h2 className="font-bold">放置商談・データ品質アラート</h2>

@@ -1,10 +1,13 @@
 import {
   AmountMetricBasis,
   ConfirmedAmountDateBasis,
+  DealType,
   DealLineItemStatus,
   DealParticipantRole,
   DealStatus,
   Prisma,
+  SalesPerformanceEventType,
+  WorkFunction,
 } from "@prisma/client";
 import { getBusinessCalendarSummary } from "./business-calendar";
 import { prisma } from "./prisma";
@@ -14,9 +17,12 @@ export type SalesReportFilter = {
   periodEnd: Date;
   businessUnitId?: string | null;
   userId?: string | null;
+  workFunction?: WorkFunction | null;
   productId?: string | null;
   productKind?: "CORE" | "ADD_ON" | "OPTIONAL" | "CROSS_SELL" | null;
   pipelineId?: string | null;
+  source?: string | null;
+  dealType?: DealType | "ALL" | null;
   forecastCategoryId?: string | null;
   dealStatus?: DealStatus | null;
 };
@@ -63,8 +69,10 @@ type LineItemForReports = Prisma.DealLineItemGetPayload<{
         probability: true;
         ownerUserId: true;
         wonAt: true;
+        lostAt: true;
         closeDate: true;
         expectedCloseDate: true;
+        dealType: true;
         source: true;
         nextAction: true;
         nextActionDate: true;
@@ -78,6 +86,7 @@ type LineItemForReports = Prisma.DealLineItemGetPayload<{
             creditShare: true;
             contributionWeight: true;
             snapshotUserName: true;
+            workFunction: true;
           };
         };
       };
@@ -95,6 +104,19 @@ function numberValue(value: Prisma.Decimal | number | null | undefined) {
 
 export function safeRate(numerator: number, denominator: number) {
   return denominator > 0 ? numerator / denominator : null;
+}
+
+export function calculateClosedDealWinRate(input: {
+  wonDealCount: number;
+  lostDealCount: number;
+}) {
+  const denominator = input.wonDealCount + input.lostDealCount;
+  return {
+    numerator: input.wonDealCount,
+    denominator,
+    rate: safeRate(input.wonDealCount, denominator),
+    lowSample: denominator > 0 && denominator < 5,
+  };
 }
 
 export function calculateProgressDerived(input: {
@@ -273,10 +295,14 @@ async function reportLineItems(
   organizationId: string,
   filter: SalesReportFilter,
 ) {
-  const dealWhere: Prisma.DealWhereInput = {};
+  const dealWhere: Prisma.DealWhereInput = { deletedAt: null };
   if (filter.pipelineId) dealWhere.pipelineId = filter.pipelineId;
   if (filter.forecastCategoryId)
     dealWhere.forecastCategoryId = filter.forecastCategoryId;
+  if (filter.source) dealWhere.source = filter.source;
+  if (filter.dealType && filter.dealType !== "ALL") {
+    dealWhere.dealType = filter.dealType;
+  }
   if (filter.dealStatus) dealWhere.status = filter.dealStatus;
   const lines = await prisma.dealLineItem.findMany({
     where: {
@@ -301,8 +327,10 @@ async function reportLineItems(
           probability: true,
           ownerUserId: true,
           wonAt: true,
+          lostAt: true,
           closeDate: true,
           expectedCloseDate: true,
+          dealType: true,
           source: true,
           nextAction: true,
           nextActionDate: true,
@@ -317,6 +345,7 @@ async function reportLineItems(
               creditShare: true,
               contributionWeight: true,
               snapshotUserName: true,
+              workFunction: true,
             },
           },
         },
@@ -1032,21 +1061,532 @@ export async function getSalespersonComparisonReport(
   organizationId: string,
   filter: SalesReportFilter,
 ) {
-  const progress = await getSalesProgressReport(organizationId, filter);
-  const rows = (progress.rows ?? []).flatMap((unit) => unit.children ?? []);
+  const [progress, { byId: businessUnitById }, members, unitMemberships, deals, lines, events] =
+    await Promise.all([
+      getSalesProgressReport(organizationId, filter),
+      businessUnitSettings(organizationId),
+      prisma.organizationMember.findMany({
+        where: {
+          organizationId,
+          status: "ACTIVE",
+        },
+        select: {
+          userId: true,
+          user: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.businessUnitMembership.findMany({
+        where: {
+          organizationId,
+          status: "ACTIVE",
+          ...(filter.businessUnitId ? { businessUnitId: filter.businessUnitId } : {}),
+          ...(filter.workFunction ? { workFunction: filter.workFunction } : {}),
+        },
+        select: { userId: true, workFunction: true, businessUnitId: true },
+      }),
+      prisma.deal.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          ...(filter.businessUnitId
+            ? { businessUnitId: filter.businessUnitId }
+            : {}),
+          ...(filter.pipelineId ? { pipelineId: filter.pipelineId } : {}),
+          ...(filter.source ? { source: filter.source } : {}),
+          ...(filter.dealType && filter.dealType !== "ALL"
+            ? { dealType: filter.dealType }
+            : {}),
+          ...(filter.dealStatus ? { status: filter.dealStatus } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          businessUnitId: true,
+          ownerUserId: true,
+          createdAt: true,
+          wonAt: true,
+          lostAt: true,
+          closeDate: true,
+          participants: {
+            where: { role: DealParticipantRole.CLOSER, status: "ACTIVE" },
+            select: {
+              userId: true,
+              creditShare: true,
+              workFunction: true,
+              snapshotUserName: true,
+            },
+          },
+        },
+      }),
+      reportLineItems(organizationId, filter),
+      prisma.salesPerformanceEvent.findMany({
+        where: {
+          organizationId,
+          cancelledAt: null,
+          occurredAt: { gte: filter.periodStart, lte: filter.periodEnd },
+          ...(filter.businessUnitId
+            ? { businessUnitId: filter.businessUnitId }
+            : {}),
+          ...(filter.userId ? { creditedUserId: filter.userId } : {}),
+          ...(filter.workFunction ? { workFunction: filter.workFunction } : {}),
+          ...(filter.productId ? { productId: filter.productId } : {}),
+        },
+        select: {
+          creditedUserId: true,
+          workFunction: true,
+          eventType: true,
+          quantity: true,
+          amount: true,
+          dealId: true,
+        },
+      }),
+    ]);
+  const progressRows = new Map(
+    (progress.rows ?? [])
+      .flatMap((unit) => unit.children ?? [])
+      .map((row) => [`${row.businessUnitId ?? "none"}:${row.userId ?? "unassigned"}`, row]),
+  );
+  const userName = new Map(members.map((item) => [item.user.id, item.user.name]));
+  const userWorkFunctions = new Map<string, WorkFunction>();
+  for (const membership of unitMemberships) {
+    if (!userWorkFunctions.has(membership.userId)) {
+      userWorkFunctions.set(membership.userId, membership.workFunction);
+    }
+  }
+  const rows = new Map<
+    string,
+    SalesProgressRow & {
+      workFunction: WorkFunction | null;
+      opportunityCount: number;
+      wonDealCount: number;
+      lostDealCount: number;
+      closedDealCount: number;
+      winRate: number | null;
+      winRateNumerator: number;
+      winRateDenominator: number;
+      winRateLowSample: boolean;
+      revenueAmount: number;
+      grossProfitAmount: number;
+      averageRevenueAmount: number | null;
+      averageGrossProfitAmount: number | null;
+      previousConfirmedAmount: number;
+      previousChangeRate: number | null;
+      calls: number;
+      connections: number;
+      ownerContacts: number;
+      fulls: number;
+      appointments: number;
+      attendedMeetings: number;
+      validMeetings: number;
+      invalidMeetings: number;
+      crossSellCreatedCount: number;
+      crossSellDealCount: number;
+      crossSellWonCount: number;
+      crossSellRevenueAmount: number;
+      crossSellGrossProfitAmount: number;
+      appointmentWinRate: number | null;
+      validMeetingWinRate: number | null;
+      drilldownDealIds: string[];
+    }
+  >();
+
+  function ensureRow(input: {
+    userId: string | null;
+    businessUnitId: string | null;
+    label?: string | null;
+    workFunction?: WorkFunction | null;
+  }) {
+    if (filter.userId && input.userId !== filter.userId) return null;
+    const key = `${input.businessUnitId ?? "none"}:${input.userId ?? "unassigned"}`;
+    if (!rows.has(key)) {
+      const base = progressRows.get(key);
+      rows.set(key, {
+        ...(base ??
+          emptyProgressRow({
+            id: `user:${key}`,
+            level: "user",
+            label:
+              input.userId === null
+                ? "担当者未設定"
+                : (input.label ?? userName.get(input.userId) ?? "担当者"),
+            businessUnitId: input.businessUnitId,
+            userId: input.userId,
+            amountBasis:
+              (input.businessUnitId
+                ? businessUnitById.get(input.businessUnitId)?.amountBasis
+                : null) ?? defaultAmountBasis,
+            dateBasis:
+              (input.businessUnitId
+                ? businessUnitById.get(input.businessUnitId)?.dateBasis
+                : null) ?? defaultDateBasis,
+          })),
+        workFunction:
+          input.workFunction ??
+          (input.userId ? userWorkFunctions.get(input.userId) : null) ??
+          null,
+        opportunityCount: 0,
+        wonDealCount: 0,
+        lostDealCount: 0,
+        closedDealCount: 0,
+        winRate: null,
+        winRateNumerator: 0,
+        winRateDenominator: 0,
+        winRateLowSample: false,
+        revenueAmount: 0,
+        grossProfitAmount: 0,
+        averageRevenueAmount: null,
+        averageGrossProfitAmount: null,
+        previousConfirmedAmount: 0,
+        previousChangeRate: null,
+        calls: 0,
+        connections: 0,
+        ownerContacts: 0,
+        fulls: 0,
+        appointments: 0,
+        attendedMeetings: 0,
+        validMeetings: 0,
+        invalidMeetings: 0,
+        crossSellCreatedCount: 0,
+        crossSellDealCount: 0,
+        crossSellWonCount: 0,
+        crossSellRevenueAmount: 0,
+        crossSellGrossProfitAmount: 0,
+        appointmentWinRate: null,
+        validMeetingWinRate: null,
+        drilldownDealIds: [],
+      });
+    }
+    return rows.get(key)!;
+  }
+
+  const visibleMembers = filter.workFunction
+    ? members.filter((member) => userWorkFunctions.get(member.user.id) === filter.workFunction)
+    : members;
+  for (const user of visibleMembers) {
+    ensureRow({
+      userId: user.user.id,
+      businessUnitId: filter.businessUnitId ?? null,
+      label: user.user.name,
+      workFunction: userWorkFunctions.get(user.user.id) ?? null,
+    });
+  }
+
+  const participantOwners = (deal: (typeof deals)[number]) => {
+    const closers = deal.participants.filter((participant) =>
+      filter.workFunction ? participant.workFunction === filter.workFunction : true,
+    );
+    if (closers.length) return closers;
+    return deal.ownerUserId
+      ? [
+          {
+            userId: deal.ownerUserId,
+            creditShare: null,
+            workFunction: userWorkFunctions.get(deal.ownerUserId) ?? null,
+            snapshotUserName: userName.get(deal.ownerUserId) ?? null,
+          },
+        ]
+      : [
+          {
+            userId: null,
+            creditShare: null,
+            workFunction: null,
+            snapshotUserName: "担当者未設定",
+          },
+        ];
+  };
+
+  const seenByRow = new Map<string, Set<string>>();
+  function addDistinct(rowKey: string, dealId: string, callback: () => void) {
+    const set = seenByRow.get(rowKey) ?? new Set<string>();
+    seenByRow.set(rowKey, set);
+    if (set.has(dealId)) return;
+    set.add(dealId);
+    callback();
+  }
+
+  for (const deal of deals) {
+    const owners = participantOwners(deal);
+    const wonDate = deal.wonAt ?? deal.closeDate;
+    const lostDate = deal.lostAt ?? deal.closeDate;
+    for (const owner of owners) {
+      const row = ensureRow({
+        userId: owner.userId,
+        businessUnitId: deal.businessUnitId,
+        label: owner.snapshotUserName,
+        workFunction: owner.workFunction,
+      });
+      if (!row) continue;
+      const rowKey = `${row.businessUnitId ?? "none"}:${row.userId ?? "unassigned"}`;
+      if (inRange(deal.createdAt, filter.periodStart, filter.periodEnd)) {
+        addDistinct(`${rowKey}:created`, deal.id, () => {
+          row.opportunityCount += 1;
+          row.drilldownDealIds.push(deal.id);
+        });
+      }
+      if (deal.status === DealStatus.WON && inRange(wonDate, filter.periodStart, filter.periodEnd)) {
+        addDistinct(`${rowKey}:won`, deal.id, () => {
+          row.wonDealCount += 1;
+          row.closedDealCount += 1;
+          row.drilldownDealIds.push(deal.id);
+        });
+      }
+      if (deal.status === DealStatus.LOST && inRange(lostDate, filter.periodStart, filter.periodEnd)) {
+        addDistinct(`${rowKey}:lost`, deal.id, () => {
+          row.lostDealCount += 1;
+          row.closedDealCount += 1;
+          row.drilldownDealIds.push(deal.id);
+        });
+      }
+    }
+  }
+
+  for (const line of lines) {
+    const unitId = line.businessUnitId ?? line.deal.businessUnitId;
+    const settings = unitId ? businessUnitById.get(unitId) : null;
+    const dateBasis = settings?.dateBasis ?? defaultDateBasis;
+    if (
+      line.status !== DealLineItemStatus.WON ||
+      !inRange(confirmedDateForLine(line, dateBasis), filter.periodStart, filter.periodEnd)
+    ) {
+      continue;
+    }
+    const owners =
+      line.deal.participants.length > 0
+        ? line.deal.participants
+        : [
+            {
+              userId: line.deal.ownerUserId,
+              creditShare: null,
+              workFunction: line.deal.ownerUserId
+                ? (userWorkFunctions.get(line.deal.ownerUserId) ?? null)
+                : null,
+              snapshotUserName: line.deal.ownerUserId
+                ? (userName.get(line.deal.ownerUserId) ?? null)
+                : "担当者未設定",
+            },
+          ];
+    const filteredOwners = owners.filter((owner) =>
+      filter.workFunction ? owner.workFunction === filter.workFunction : true,
+    );
+    if (!filteredOwners.length) continue;
+    for (const allocation of allocateAmountByClosers(
+      numberValue(line.revenueAmount),
+      filteredOwners.map((owner) => ({
+        userId: owner.userId,
+        creditShare:
+          owner.creditShare === null ? null : numberValue(owner.creditShare),
+      })),
+    )) {
+      const owner = filteredOwners.find((item) => item.userId === allocation.userId);
+      const row = ensureRow({
+        userId: allocation.userId,
+        businessUnitId: unitId ?? null,
+        label: owner?.snapshotUserName,
+        workFunction: owner?.workFunction ?? null,
+      });
+      if (!row) continue;
+      row.revenueAmount += allocation.amount;
+    }
+    for (const allocation of allocateAmountByClosers(
+      numberValue(line.grossProfitAmount),
+      filteredOwners.map((owner) => ({
+        userId: owner.userId,
+        creditShare:
+          owner.creditShare === null ? null : numberValue(owner.creditShare),
+      })),
+    )) {
+      const owner = filteredOwners.find((item) => item.userId === allocation.userId);
+      const row = ensureRow({
+        userId: allocation.userId,
+        businessUnitId: unitId ?? null,
+        label: owner?.snapshotUserName,
+        workFunction: owner?.workFunction ?? null,
+      });
+      if (!row) continue;
+      row.grossProfitAmount += allocation.amount;
+    }
+  }
+
+  const quantity = (value: Prisma.Decimal | number | null | undefined) =>
+    numberValue(value) || 1;
+  for (const event of events) {
+    const row = ensureRow({
+      userId: event.creditedUserId,
+      businessUnitId: filter.businessUnitId ?? null,
+      workFunction: event.workFunction,
+    });
+    if (!row) continue;
+    const q = quantity(event.quantity);
+    if (event.eventType === SalesPerformanceEventType.CALL) row.calls += q;
+    if (event.eventType === SalesPerformanceEventType.CONNECTION) row.connections += q;
+    if (event.eventType === SalesPerformanceEventType.OWNER_CONTACT) row.ownerContacts += q;
+    if (event.eventType === SalesPerformanceEventType.FULL) row.fulls += q;
+    if (event.eventType === SalesPerformanceEventType.APPOINTMENT_SET) row.appointments += q;
+    if (event.eventType === SalesPerformanceEventType.MEETING_ATTENDED) row.attendedMeetings += q;
+    if (event.eventType === SalesPerformanceEventType.VALID_MEETING) row.validMeetings += q;
+    if (event.eventType === SalesPerformanceEventType.INVALID_MEETING) row.invalidMeetings += q;
+    if (event.eventType === SalesPerformanceEventType.CROSS_SELL_CREATED) row.crossSellCreatedCount += q;
+    if (event.eventType === SalesPerformanceEventType.CROSS_SELL_MEETING_SET) row.crossSellDealCount += q;
+    if (event.eventType === SalesPerformanceEventType.CROSS_SELL_WON) {
+      row.crossSellWonCount += q;
+      row.crossSellGrossProfitAmount += numberValue(event.amount);
+    }
+    if (event.eventType === SalesPerformanceEventType.CROSS_SELL_ORIGINATED_GP) {
+      row.crossSellGrossProfitAmount += numberValue(event.amount);
+    }
+  }
+
+  for (const row of rows.values()) {
+    const winRate = calculateClosedDealWinRate({
+      wonDealCount: row.wonDealCount,
+      lostDealCount: row.lostDealCount,
+    });
+    row.winRateNumerator = winRate.numerator;
+    row.winRateDenominator = winRate.denominator;
+    row.winRate = winRate.rate;
+    row.winRateLowSample = winRate.lowSample;
+    row.averageRevenueAmount = safeRate(row.revenueAmount, row.wonDealCount);
+    row.averageGrossProfitAmount = safeRate(row.grossProfitAmount, row.wonDealCount);
+    row.appointmentWinRate = safeRate(row.wonDealCount, row.appointments);
+    row.validMeetingWinRate = safeRate(row.wonDealCount, row.validMeetings);
+  }
+
+  const outputRows = Array.from(rows.values()).filter((row) => {
+    if (filter.userId && row.userId !== filter.userId) return false;
+    return (
+      row.opportunityCount > 0 ||
+      row.wonDealCount > 0 ||
+      row.lostDealCount > 0 ||
+      row.confirmedAmount > 0 ||
+      row.landingForecastAmount > 0 ||
+      row.calls > 0 ||
+      row.appointments > 0 ||
+      row.crossSellCreatedCount > 0 ||
+      row.targetAmount > 0
+    );
+  });
   return {
     periodStart: progress.periodStart,
     periodEnd: progress.periodEnd,
     basisLabel: progress.basisLabel,
     dateBasisLabel: progress.dateBasisLabel,
-    rows: rows.map((row) => ({
-      ...row,
-      winRate: safeRate(
-        row.confirmedAmount,
-        row.openForecastAmount + row.confirmedAmount,
-      ),
-    })),
+    winRateDefinition: "受注件数 ÷ クローズ商談数（WON + LOST）",
+    rows: outputRows.sort((a, b) => {
+      if (b.winRateDenominator !== a.winRateDenominator)
+        return b.winRateDenominator - a.winRateDenominator;
+      return b.grossProfitAmount - a.grossProfitAmount;
+    }),
     warnings: progress.warnings,
+  };
+}
+
+export async function getExecutiveDashboardData(
+  organizationId: string,
+  filter: SalesReportFilter,
+) {
+  const [progress, salespeople, pipelines, overdueTasks, monthDeals] =
+    await Promise.all([
+      getSalesProgressReport(organizationId, filter),
+      getSalespersonComparisonReport(organizationId, filter),
+      prisma.pipeline.findMany({
+        where: {
+          organizationId,
+          isDefault: true,
+          ...(filter.businessUnitId ? { businessUnitId: filter.businessUnitId } : {}),
+        },
+        include: {
+          businessUnit: { select: { id: true, name: true } },
+          stages: {
+            include: {
+              deals: {
+                where: {
+                  organizationId,
+                  deletedAt: null,
+                  ...(filter.businessUnitId
+                    ? { businessUnitId: filter.businessUnitId }
+                    : {}),
+                },
+                select: { id: true, amount: true },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+        orderBy: [{ businessUnit: { displayOrder: "asc" } }, { createdAt: "asc" }],
+      }),
+      prisma.task.count({
+        where: {
+          organizationId,
+          dueDate: { lt: filter.periodEnd },
+          status: { notIn: ["COMPLETED", "CANCELED"] },
+        },
+      }),
+      prisma.deal.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          createdAt: { gte: filter.periodStart, lte: filter.periodEnd },
+          ...(filter.businessUnitId ? { businessUnitId: filter.businessUnitId } : {}),
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
+
+  const salesByBusinessUnit = new Map<string | null, typeof salespeople.rows>();
+  for (const row of salespeople.rows) {
+    const key = row.businessUnitId ?? null;
+    salesByBusinessUnit.set(key, [...(salesByBusinessUnit.get(key) ?? []), row]);
+  }
+  const businessUnits = (progress.rows ?? []).map((row) => {
+    const people = salesByBusinessUnit.get(row.businessUnitId ?? null) ?? [];
+    const wonDealCount = people.reduce((sum, person) => sum + person.wonDealCount, 0);
+    const lostDealCount = people.reduce((sum, person) => sum + person.lostDealCount, 0);
+    return {
+      ...row,
+      opportunityCount: people.reduce((sum, person) => sum + person.opportunityCount, 0),
+      wonDealCount,
+      lostDealCount,
+      closedDealCount: wonDealCount + lostDealCount,
+      winRate: safeRate(wonDealCount, wonDealCount + lostDealCount),
+      winRateNumerator: wonDealCount,
+      winRateDenominator: wonDealCount + lostDealCount,
+      winRateLowSample: wonDealCount + lostDealCount > 0 && wonDealCount + lostDealCount < 5,
+    };
+  });
+
+  return {
+    periodStart: progress.periodStart,
+    periodEnd: progress.periodEnd,
+    overall: {
+      ...progress.summary,
+      opportunityAmount: numberValue(monthDeals._sum.amount),
+      opportunityCount: monthDeals._count,
+      overdueTaskCount: overdueTasks,
+      wonDealCount: salespeople.rows.reduce((sum, row) => sum + row.wonDealCount, 0),
+      lostDealCount: salespeople.rows.reduce((sum, row) => sum + row.lostDealCount, 0),
+      winRate: safeRate(
+        salespeople.rows.reduce((sum, row) => sum + row.wonDealCount, 0),
+        salespeople.rows.reduce((sum, row) => sum + row.closedDealCount, 0),
+      ),
+      winRateDenominator: salespeople.rows.reduce((sum, row) => sum + row.closedDealCount, 0),
+    },
+    businessUnits,
+    salespeople,
+    pipelines: pipelines.map((pipeline) => ({
+      id: pipeline.id,
+      name: pipeline.name,
+      businessUnitId: pipeline.businessUnitId,
+      businessUnitName: pipeline.businessUnit?.name ?? "事業部未設定",
+      stages: pipeline.stages.map((stage) => ({
+        id: stage.id,
+        name: stage.name,
+        stageType: stage.stageType,
+        count: stage.deals.length,
+        amount: stage.deals.reduce((sum, deal) => sum + numberValue(deal.amount), 0),
+      })),
+    })),
   };
 }
 

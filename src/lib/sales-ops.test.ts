@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allocateAmountByClosers,
+  calculateClosedDealWinRate,
   calculateAttachmentRate,
   calculateProgressDerived,
   safeRate,
@@ -86,6 +87,55 @@ describe("sales operations calculations", () => {
     expect(allocations.reduce((sum, item) => sum + item.amount, 0)).toBe(
       1_000_000,
     );
+  });
+
+  it("allocates equally when closer credit share is not set", () => {
+    const allocations = allocateAmountByClosers(900_000, [
+      { userId: "sales-a", creditShare: null },
+      { userId: "sales-b", creditShare: null },
+      { userId: "sales-c", creditShare: null },
+    ]);
+
+    expect(allocations.map((item) => item.amount)).toEqual([
+      300_000, 300_000, 300_000,
+    ]);
+    expect(allocations.reduce((sum, item) => sum + item.amount, 0)).toBe(
+      900_000,
+    );
+  });
+
+  it("defines win rate as WON divided by WON plus LOST only", () => {
+    const result = calculateClosedDealWinRate({
+      wonDealCount: 7,
+      lostDealCount: 13,
+    });
+
+    expect(result.rate).toBe(0.35);
+    expect(result.numerator).toBe(7);
+    expect(result.denominator).toBe(20);
+    expect(result.lowSample).toBe(false);
+  });
+
+  it("marks small closed-deal denominators as reference values", () => {
+    const result = calculateClosedDealWinRate({
+      wonDealCount: 1,
+      lostDealCount: 0,
+    });
+
+    expect(result.rate).toBe(1);
+    expect(result.denominator).toBe(1);
+    expect(result.lowSample).toBe(true);
+  });
+
+  it("returns null win rate when WON plus LOST is zero", () => {
+    const result = calculateClosedDealWinRate({
+      wonDealCount: 0,
+      lostDealCount: 0,
+    });
+
+    expect(result.rate).toBeNull();
+    expect(result.denominator).toBe(0);
+    expect(result.lowSample).toBe(false);
   });
 
   it("returns null for denominator-zero rates", () => {

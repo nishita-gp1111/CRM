@@ -814,6 +814,8 @@ export const reportQuerySchema = metricQuerySchema.extend({
     .nullable()
     .optional(),
   pipelineId: optionalUuid,
+  source: optionalText(120),
+  dealType: z.enum(["NEW_BUSINESS", "CROSS_SELL", "ALL"]).nullable().optional(),
   forecastCategoryId: optionalUuid,
   dealStatus: z
     .enum(["OPEN", "WON", "LOST", "CANCELLED", "INVALID", "NURTURE"])
