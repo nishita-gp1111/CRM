@@ -3,7 +3,12 @@ import { redirect } from "next/navigation";
 import { DailyMetricForm } from "@/components/kpi/daily-metric-form";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
-import { getAccessibleBusinessUnits } from "@/lib/business-units";
+import {
+  canManageDailyMetricEntries,
+  getDailyMetricScope,
+  getDailyMetricUserOptions,
+  getEnabledDailyMetricFieldConfigs,
+} from "@/lib/daily-metric-fields";
 import { jstDateOnly, jstDateString } from "@/lib/jst-date";
 import { hasPermission, Permission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -28,41 +33,39 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
   const context = await getAuthContext();
   if (!context) redirect("/login");
   const params = (await searchParams) ?? {};
-  const businessUnits = await getAccessibleBusinessUnits(context);
-  const selectedBusinessUnitId =
-    one(params.businessUnitId) ??
-    context.membership.selectedBusinessUnitId ??
-    businessUnits[0]?.id ??
-    "";
-  const requestedWorkFunction = one(params.workFunction) ?? "IS";
-  const selectedWorkFunction = ["IS", "FS", "CS"].includes(requestedWorkFunction)
-    ? requestedWorkFunction
-    : "IS";
+  const canManage = canManageDailyMetricEntries(context);
+  const canManageFields = hasPermission(context.membership.role, Permission.MANAGE_KPI);
+  const scope = await getDailyMetricScope({
+    context,
+    requestedBusinessUnitId: one(params.businessUnitId),
+    requestedWorkFunction: one(params.workFunction),
+    canManage,
+  });
+  const businessUnits = scope.businessUnits;
+  const selectedBusinessUnitId = scope.selectedBusinessUnitId;
+  const selectedWorkFunction = scope.selectedWorkFunction;
   const targetDate = one(params.targetDate) ?? todayString();
-  const canManage = hasPermission(context.membership.role, Permission.MANAGE_TARGETS);
-  const members = await prisma.organizationMember.findMany({
-    where: { organizationId: context.organization.id, status: "ACTIVE" },
-    select: { user: { select: { id: true, name: true, email: true } } },
-    orderBy: { createdAt: "asc" },
+  if (!selectedBusinessUnitId) redirect("/dashboard");
+  const userOptions = await getDailyMetricUserOptions({
+    organizationId: context.organization.id,
+    businessUnitId: selectedBusinessUnitId,
+    workFunction: selectedWorkFunction,
   });
-  const users = members.map((member) => member.user);
-  const targetUserId =
-    canManage && one(params.userId) ? one(params.userId)! : context.user.id;
-  const definitions = await prisma.metricDefinition.findMany({
-    where: {
-      organizationId: context.organization.id,
-      sourceType: "MANUAL_DAILY",
-      isActive: true,
-      ...(selectedBusinessUnitId
-        ? { OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }] }
-        : {}),
-      ...(selectedWorkFunction
-        ? { OR: [{ workFunction: selectedWorkFunction as "IS" | "FS" | "CS" }, { workFunction: null }] }
-        : {}),
-    },
-    select: { id: true, displayName: true, description: true },
-    orderBy: [{ displayOrder: "asc" }],
+  const users = canManage
+    ? userOptions
+    : userOptions.filter((user) => user.id === context.user.id);
+  const requestedUserId = one(params.userId);
+  const targetUserId = canManage
+    ? userOptions.find((user) => user.id === requestedUserId)?.id ??
+      userOptions[0]?.id ??
+      context.user.id
+    : context.user.id;
+  const configs = await getEnabledDailyMetricFieldConfigs({
+    organizationId: context.organization.id,
+    businessUnitId: selectedBusinessUnitId,
+    workFunction: selectedWorkFunction,
   });
+  const definitions = configs.map((config) => config.metricDefinition);
   const metricDefinitionIds = definitions.map((definition) => definition.id);
   const targetDateValue = dateOnly(targetDate);
   const [entries, allEntries, expectedMemberships, territories, industries, products, campaigns, callLists] = await Promise.all([
@@ -71,7 +74,7 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
         organizationId: context.organization.id,
         userId: targetUserId,
         businessUnitId: selectedBusinessUnitId,
-        workFunction: selectedWorkFunction as "IS" | "FS" | "CS",
+        workFunction: selectedWorkFunction,
         targetDate: targetDateValue,
         metricDefinitionId: { in: metricDefinitionIds },
       },
@@ -87,7 +90,7 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
       where: {
         organizationId: context.organization.id,
         businessUnitId: selectedBusinessUnitId,
-        workFunction: selectedWorkFunction as "IS" | "FS" | "CS",
+        workFunction: selectedWorkFunction,
         targetDate: targetDateValue,
         metricDefinitionId: { in: metricDefinitionIds },
       },
@@ -108,8 +111,13 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
           where: {
             organizationId: context.organization.id,
             businessUnitId: selectedBusinessUnitId,
-            workFunction: selectedWorkFunction as "IS" | "FS" | "CS",
+            workFunction: selectedWorkFunction,
             status: "ACTIVE",
+            user: {
+              memberships: {
+                some: { organizationId: context.organization.id, status: "ACTIVE" },
+              },
+            },
           },
           select: { user: { select: { id: true, name: true } } },
         })
@@ -129,7 +137,16 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
     }),
     prisma.product.findMany({
-      where: { organizationId: context.organization.id, status: "ACTIVE" },
+      where: {
+        organizationId: context.organization.id,
+        status: "ACTIVE",
+        businessUnitProducts: {
+          some: {
+            businessUnitId: selectedBusinessUnitId,
+            status: "ACTIVE",
+          },
+        },
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
@@ -161,7 +178,7 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
     }),
   ]);
   const expectedUsers =
-    expectedMemberships.length > 0
+    canManage && expectedMemberships.length > 0
       ? expectedMemberships.map((membership) => membership.user)
       : users.map((user) => ({ id: user.id, name: user.name }));
   const submittedUserIds = new Set(
@@ -169,7 +186,9 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
       .filter((entry) => ["SUBMITTED", "APPROVED", "LOCKED"].includes(entry.status))
       .map((entry) => entry.userId),
   );
-  const missingUsers = expectedUsers.filter((user) => !submittedUserIds.has(user.id));
+  const missingUsers = canManage
+    ? expectedUsers.filter((user) => !submittedUserIds.has(user.id))
+    : [];
   const definitionNameById = new Map(
     definitions.map((definition) => [definition.id, definition.displayName]),
   );
@@ -207,9 +226,19 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
         title="日次実績入力"
         description="架電、接続、オーナー、フル、アポなどの手入力KPIを日別に保存、提出、承認、ロックします。"
         action={
-          <Link href="/reports" className="secondary-button">
-            レポートへ
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {canManageFields ? (
+              <Link
+                href={`/settings/daily-metric-fields?businessUnitId=${selectedBusinessUnitId}&workFunction=${selectedWorkFunction}`}
+                className="secondary-button"
+              >
+                入力項目を管理
+              </Link>
+            ) : null}
+            <Link href="/reports" className="secondary-button">
+              レポートへ
+            </Link>
+          </div>
         }
       />
       <DailyMetricForm
@@ -226,6 +255,7 @@ export default async function DailyMetricsPage({ searchParams }: Props) {
         targetUserId={targetUserId}
         currentUserId={context.user.id}
         canManage={canManage}
+        canManageFields={canManageFields}
         missingUsers={missingUsers}
         approvalEntries={approvalEntries}
         warnings={warnings}

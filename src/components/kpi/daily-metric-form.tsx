@@ -63,6 +63,7 @@ export function DailyMetricForm({
   targetUserId,
   currentUserId,
   canManage,
+  canManageFields,
   missingUsers,
   approvalEntries,
   warnings,
@@ -82,6 +83,7 @@ export function DailyMetricForm({
   targetUserId: string;
   currentUserId: string;
   canManage: boolean;
+  canManageFields: boolean;
   missingUsers: UserOption[];
   approvalEntries: ApprovalEntry[];
   warnings: string[];
@@ -229,6 +231,14 @@ export function DailyMetricForm({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canManageFields ? (
+                  <a
+                    className="secondary-button"
+                    href={`/settings/daily-metric-fields?businessUnitId=${selectedBusinessUnitId}&workFunction=${selectedWorkFunction}`}
+                  >
+                    入力項目を管理
+                  </a>
+                ) : null}
                 {hasLockedEntries ? (
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
                     ロック済み

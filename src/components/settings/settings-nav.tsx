@@ -7,6 +7,7 @@ const items = [
   ["/settings/delivery-pipelines", "制作パイプライン"],
   ["/settings/products", "商品・価格"],
   ["/settings/kpis", "KPI定義"],
+  ["/settings/daily-metric-fields", "日次入力項目設定"],
   ["/settings/targets", "KPI目標"],
   ["/settings/custom-properties", "カスタム項目"],
   ["/settings/email-templates", "メールテンプレート"],

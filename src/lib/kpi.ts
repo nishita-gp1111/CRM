@@ -472,6 +472,27 @@ export async function getKpiDashboardData(
       organizationId: context.organization.id,
       isActive: true,
       isVisibleByDefault: true,
+      ...(fullFilter.businessUnitId && fullFilter.workFunction
+        ? {
+            AND: [
+              {
+                OR: [
+                  { sourceType: { not: MetricSourceType.MANUAL_DAILY } },
+                  {
+                    sourceType: MetricSourceType.MANUAL_DAILY,
+                    dailyFieldConfigs: {
+                      some: {
+                        businessUnitId: fullFilter.businessUnitId,
+                        workFunction: fullFilter.workFunction,
+                        isEnabled: true,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
+        : {}),
       ...(fullFilter.businessUnitId
         ? { OR: [{ businessUnitId: fullFilter.businessUnitId }, { businessUnitId: null }] }
         : {}),

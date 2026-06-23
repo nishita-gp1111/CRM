@@ -438,11 +438,11 @@ enum CalendarExternalChangeType {
 }
 
 enum CalendarSyncJobStatus {
-  PENDING    @map("pending")
-  RUNNING    @map("running")
-  SUCCEEDED  @map("succeeded")
-  FAILED     @map("failed")
-  SKIPPED    @map("skipped")
+  PENDING   @map("pending")
+  RUNNING   @map("running")
+  SUCCEEDED @map("succeeded")
+  FAILED    @map("failed")
+  SKIPPED   @map("skipped")
 
   @@map("calendar_sync_job_status")
 }
@@ -451,28 +451,28 @@ enum CalendarSyncJobType {
   FULL_SYNC        @map("full_sync")
   INCREMENTAL_SYNC @map("incremental_sync")
   WATCH_RENEWAL    @map("watch_renewal")
-  WEBHOOK_SYNC      @map("webhook_sync")
-  MANUAL_SYNC       @map("manual_sync")
+  WEBHOOK_SYNC     @map("webhook_sync")
+  MANUAL_SYNC      @map("manual_sync")
 
   @@map("calendar_sync_job_type")
 }
 
 enum OperationalEventType {
-  FORM_SUBMISSION_SUCCEEDED       @map("form_submission_succeeded")
-  FORM_SUBMISSION_FAILED          @map("form_submission_failed")
-  BOOKING_SUCCEEDED               @map("booking_succeeded")
-  BOOKING_CONFLICT_PREVENTED      @map("booking_conflict_prevented")
-  GOOGLE_SYNC_SUCCEEDED           @map("google_sync_succeeded")
-  GOOGLE_SYNC_FAILED              @map("google_sync_failed")
-  GOOGLE_RETRY_SUCCEEDED          @map("google_retry_succeeded")
-  GOOGLE_REAUTH_REQUIRED          @map("google_reauth_required")
-  WEBHOOK_RECEIVED                @map("webhook_received")
-  WEBHOOK_REJECTED                @map("webhook_rejected")
-  WATCH_CHANNEL_EXPIRING          @map("watch_channel_expiring")
-  WATCH_CHANNEL_RENEWED           @map("watch_channel_renewed")
-  EXTERNAL_CHANGE_DETECTED        @map("external_change_detected")
-  ROUND_ROBIN_ASSIGNED            @map("round_robin_assigned")
-  ASSIGNMENT_FAILED               @map("assignment_failed")
+  FORM_SUBMISSION_SUCCEEDED  @map("form_submission_succeeded")
+  FORM_SUBMISSION_FAILED     @map("form_submission_failed")
+  BOOKING_SUCCEEDED          @map("booking_succeeded")
+  BOOKING_CONFLICT_PREVENTED @map("booking_conflict_prevented")
+  GOOGLE_SYNC_SUCCEEDED      @map("google_sync_succeeded")
+  GOOGLE_SYNC_FAILED         @map("google_sync_failed")
+  GOOGLE_RETRY_SUCCEEDED     @map("google_retry_succeeded")
+  GOOGLE_REAUTH_REQUIRED     @map("google_reauth_required")
+  WEBHOOK_RECEIVED           @map("webhook_received")
+  WEBHOOK_REJECTED           @map("webhook_rejected")
+  WATCH_CHANNEL_EXPIRING     @map("watch_channel_expiring")
+  WATCH_CHANNEL_RENEWED      @map("watch_channel_renewed")
+  EXTERNAL_CHANGE_DETECTED   @map("external_change_detected")
+  ROUND_ROBIN_ASSIGNED       @map("round_robin_assigned")
+  ASSIGNMENT_FAILED          @map("assignment_failed")
 
   @@map("operational_event_type")
 }
@@ -815,6 +815,7 @@ model Organization {
   fieldVisits                FieldVisit[]
   metricDefinitions          MetricDefinition[]
   metricDefinitionVersions   MetricDefinitionVersion[]
+  dailyMetricFieldConfigs    DailyMetricFieldConfig[]
   dailyMetricEntries         DailyMetricEntry[]
   metricValidationRules      MetricValidationRule[]
   kpiTargets                 KpiTarget[]
@@ -864,15 +865,16 @@ model BusinessUnit {
   createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships        BusinessUnitMembership[]
-  selectedByMembers  OrganizationMember[]     @relation("SelectedBusinessUnit")
-  pipelines          Pipeline[]
-  deals              Deal[]
-  forms              Form[]
-  products           BusinessUnitProduct[]
-  forecastCategories ForecastCategory[]
-  businessCalendars  BusinessCalendar[]
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships             BusinessUnitMembership[]
+  selectedByMembers       OrganizationMember[]     @relation("SelectedBusinessUnit")
+  pipelines               Pipeline[]
+  deals                   Deal[]
+  forms                   Form[]
+  products                BusinessUnitProduct[]
+  forecastCategories      ForecastCategory[]
+  businessCalendars       BusinessCalendar[]
+  dailyMetricFieldConfigs DailyMetricFieldConfig[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, name])
@@ -1128,17 +1130,17 @@ model ObjectAssociation {
 }
 
 model Activity {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  actorUserId    String?      @map("actor_user_id") @db.Uuid
-  deliveryProjectId String?   @map("delivery_project_id") @db.Uuid
-  type           ActivityType
-  title          String       @db.VarChar(200)
-  body           String?
-  metadata       Json         @default("{}") @db.JsonB
-  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
+  id                String       @id @default(uuid()) @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  actorUserId       String?      @map("actor_user_id") @db.Uuid
+  deliveryProjectId String?      @map("delivery_project_id") @db.Uuid
+  type              ActivityType
+  title             String       @db.VarChar(200)
+  body              String?
+  metadata          Json         @default("{}") @db.JsonB
+  occurredAt        DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
@@ -1149,22 +1151,22 @@ model Activity {
 }
 
 model Task {
-  id              String       @id @default(uuid()) @db.Uuid
-  organizationId  String       @map("organization_id") @db.Uuid
-  ownerUserId     String       @map("owner_user_id") @db.Uuid
-  createdByUserId String       @map("created_by_user_id") @db.Uuid
-  deliveryProjectId String?    @map("delivery_project_id") @db.Uuid
-  sourceDeliveryStageId String? @map("source_delivery_stage_id") @db.Uuid
-  autoTaskKey     String?      @map("auto_task_key") @db.VarChar(240)
-  title           String       @db.VarChar(200)
-  description     String?
-  dueDate         DateTime?    @map("due_date") @db.Timestamptz(3)
-  status          TaskStatus   @default(TODO)
-  priority        TaskPriority @default(MEDIUM)
-  taskType        TaskType     @default(OTHER) @map("task_type")
-  completedAt     DateTime?    @map("completed_at") @db.Timestamptz(3)
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                    String       @id @default(uuid()) @db.Uuid
+  organizationId        String       @map("organization_id") @db.Uuid
+  ownerUserId           String       @map("owner_user_id") @db.Uuid
+  createdByUserId       String       @map("created_by_user_id") @db.Uuid
+  deliveryProjectId     String?      @map("delivery_project_id") @db.Uuid
+  sourceDeliveryStageId String?      @map("source_delivery_stage_id") @db.Uuid
+  autoTaskKey           String?      @map("auto_task_key") @db.VarChar(240)
+  title                 String       @db.VarChar(200)
+  description           String?
+  dueDate               DateTime?    @map("due_date") @db.Timestamptz(3)
+  status                TaskStatus   @default(TODO)
+  priority              TaskPriority @default(MEDIUM)
+  taskType              TaskType     @default(OTHER) @map("task_type")
+  completedAt           DateTime?    @map("completed_at") @db.Timestamptz(3)
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner        User         @relation("TaskOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
@@ -1316,41 +1318,41 @@ model AvailabilityException {
 }
 
 model MeetingLink {
-  id                             String                  @id @default(uuid()) @db.Uuid
-  organizationId                 String                  @map("organization_id") @db.Uuid
-  userId                         String                  @map("user_id") @db.Uuid
-  ownerUserId                    String?                 @map("owner_user_id") @db.Uuid
-  businessUnitId                 String?                 @map("business_unit_id") @db.Uuid
-  teamId                         String?                 @map("team_id") @db.Uuid
-  name                           String                  @db.VarChar(160)
-  slug                           String                  @unique @db.VarChar(100)
-  assignmentMode                 AssignmentMode          @default(FIXED_USER) @map("assignment_mode")
-  workFunction                   WorkFunction?           @map("work_function")
-  durationMinutes                Int                     @default(30) @map("duration_minutes")
-  bufferBeforeMinutes            Int                     @default(0) @map("buffer_before_minutes")
-  bufferAfterMinutes             Int                     @default(0) @map("buffer_after_minutes")
-  minimumNoticeMinutes           Int                     @default(60) @map("minimum_notice_minutes")
-  bookingHorizonDays             Int                     @default(14) @map("booking_horizon_days")
-  timezone                       String                  @default("Asia/Tokyo") @db.VarChar(80)
-  locationType                   MeetingLocationType     @default(GOOGLE_MEET) @map("location_type")
-  locationValue                  String?                 @map("location_value") @db.VarChar(500)
-  availableWeekdays              Json                    @default("[1,2,3,4,5]") @map("available_weekdays") @db.JsonB
-  availableStartMinutes          Int                     @default(600) @map("available_start_minutes")
-  availableEndMinutes            Int                     @default(1080) @map("available_end_minutes")
-  slotIntervalMinutes            Int                     @default(30) @map("slot_interval_minutes")
-  maxBookingsPerDay              Int?                    @map("max_bookings_per_day")
-  cancellationDeadlineMinutes    Int?                    @map("cancellation_deadline_minutes")
-  rescheduleDeadlineMinutes      Int?                    @map("reschedule_deadline_minutes")
-  status                         MeetingLinkStatus       @default(ACTIVE)
-  isActive                       Boolean                 @default(true) @map("is_active")
-  googleCalendarEnabled          Boolean                 @default(false) @map("google_calendar_enabled")
-  titleTemplate                  String?                 @map("title_template") @db.VarChar(240)
-  holdMinutes                    Int                     @default(5) @map("hold_minutes")
-  appointmentCreditPolicy        AppointmentCreditPolicy @default(ASSIGNED_USER) @map("appointment_credit_policy")
-  appointmentCreditFixedUserId   String?                 @map("appointment_credit_fixed_user_id") @db.Uuid
-  googleFallbackMode             String                  @default("crm_only") @map("google_fallback_mode") @db.VarChar(80)
-  createdAt                      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                           String                  @id @default(uuid()) @db.Uuid
+  organizationId               String                  @map("organization_id") @db.Uuid
+  userId                       String                  @map("user_id") @db.Uuid
+  ownerUserId                  String?                 @map("owner_user_id") @db.Uuid
+  businessUnitId               String?                 @map("business_unit_id") @db.Uuid
+  teamId                       String?                 @map("team_id") @db.Uuid
+  name                         String                  @db.VarChar(160)
+  slug                         String                  @unique @db.VarChar(100)
+  assignmentMode               AssignmentMode          @default(FIXED_USER) @map("assignment_mode")
+  workFunction                 WorkFunction?           @map("work_function")
+  durationMinutes              Int                     @default(30) @map("duration_minutes")
+  bufferBeforeMinutes          Int                     @default(0) @map("buffer_before_minutes")
+  bufferAfterMinutes           Int                     @default(0) @map("buffer_after_minutes")
+  minimumNoticeMinutes         Int                     @default(60) @map("minimum_notice_minutes")
+  bookingHorizonDays           Int                     @default(14) @map("booking_horizon_days")
+  timezone                     String                  @default("Asia/Tokyo") @db.VarChar(80)
+  locationType                 MeetingLocationType     @default(GOOGLE_MEET) @map("location_type")
+  locationValue                String?                 @map("location_value") @db.VarChar(500)
+  availableWeekdays            Json                    @default("[1,2,3,4,5]") @map("available_weekdays") @db.JsonB
+  availableStartMinutes        Int                     @default(600) @map("available_start_minutes")
+  availableEndMinutes          Int                     @default(1080) @map("available_end_minutes")
+  slotIntervalMinutes          Int                     @default(30) @map("slot_interval_minutes")
+  maxBookingsPerDay            Int?                    @map("max_bookings_per_day")
+  cancellationDeadlineMinutes  Int?                    @map("cancellation_deadline_minutes")
+  rescheduleDeadlineMinutes    Int?                    @map("reschedule_deadline_minutes")
+  status                       MeetingLinkStatus       @default(ACTIVE)
+  isActive                     Boolean                 @default(true) @map("is_active")
+  googleCalendarEnabled        Boolean                 @default(false) @map("google_calendar_enabled")
+  titleTemplate                String?                 @map("title_template") @db.VarChar(240)
+  holdMinutes                  Int                     @default(5) @map("hold_minutes")
+  appointmentCreditPolicy      AppointmentCreditPolicy @default(ASSIGNED_USER) @map("appointment_credit_policy")
+  appointmentCreditFixedUserId String?                 @map("appointment_credit_fixed_user_id") @db.Uuid
+  googleFallbackMode           String                  @default("crm_only") @map("google_fallback_mode") @db.VarChar(80)
+  createdAt                    DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1362,69 +1364,70 @@ model MeetingLink {
 }
 
 model MeetingBooking {
-  id                          String               @id @default(uuid()) @db.Uuid
-  organizationId              String               @map("organization_id") @db.Uuid
-  meetingLinkId               String               @map("meeting_link_id") @db.Uuid
-  contactId                   String?              @map("contact_id") @db.Uuid
-  companyId                   String?              @map("company_id") @db.Uuid
-  businessUnitId              String?              @map("business_unit_id") @db.Uuid
-  dealId                      String?              @map("deal_id") @db.Uuid
-  formSubmissionId            String?              @map("form_submission_id") @db.Uuid
-  bookingHoldId               String?              @map("booking_hold_id") @db.Uuid
-  externalSubmissionId        String?              @map("external_submission_id") @db.VarChar(240)
-  setByUserId                 String?              @map("set_by_user_id") @db.Uuid
-  hostUserId                  String?              @map("host_user_id") @db.Uuid
-  assignedUserId              String?              @map("assigned_user_id") @db.Uuid
-  creditedAppointmentSetterId String?              @map("credited_appointment_setter_id") @db.Uuid
-  submittedByContactId        String?              @map("submitted_by_contact_id") @db.Uuid
-  guestName                   String               @map("guest_name") @db.VarChar(120)
-  guestEmail                  String               @map("guest_email") @db.VarChar(320)
-  guestPhone                  String?              @map("guest_phone") @db.VarChar(40)
-  startsAt                    DateTime             @map("starts_at") @db.Timestamptz(3)
-  endsAt                      DateTime             @map("ends_at") @db.Timestamptz(3)
-  status                      MeetingBookingStatus @default(SCHEDULED)
-  bookingStatus               BookingStatus        @default(CONFIRMED) @map("booking_status")
-  syncStatus                  CalendarSyncStatus   @default(NOT_REQUIRED) @map("sync_status")
-  qualificationResult         QualificationResult  @default(UNDETERMINED) @map("qualification_result")
-  appointmentSetAt            DateTime?            @map("appointment_set_at") @db.Timestamptz(3)
-  attendedAt                  DateTime?            @map("attended_at") @db.Timestamptz(3)
-  cancelledAt                 DateTime?            @map("cancelled_at") @db.Timestamptz(3)
-  noShowAt                    DateTime?            @map("no_show_at") @db.Timestamptz(3)
-  sourceChannel               String?              @map("source_channel") @db.VarChar(120)
-  territoryId                 String?              @map("territory_id") @db.Uuid
-  prefectureCode              String?              @map("prefecture_code") @db.VarChar(2)
-  city                        String?              @db.VarChar(120)
-  industryId                  String?              @map("industry_id") @db.Uuid
-  productId                   String?              @map("product_id") @db.Uuid
-  campaignId                  String?              @map("campaign_id") @db.Uuid
-  callListId                  String?              @map("call_list_id") @db.Uuid
-  meetingType                 String?              @map("meeting_type") @db.VarChar(120)
-  timezone                    String               @default("Asia/Tokyo") @db.VarChar(80)
-  idempotencyKey              String?              @map("idempotency_key") @db.VarChar(240)
-  googleCalendarId            String?              @map("google_calendar_id") @db.VarChar(240)
-  googleEventId               String?              @map("google_event_id") @db.VarChar(240)
-  googleEventEtag             String?              @map("google_event_etag") @db.VarChar(240)
-  googleEventHtmlLink         String?              @map("google_event_html_link")
-  googleEventICalUid          String?              @map("google_event_ical_uid") @db.VarChar(240)
-  lastSyncedAt                DateTime?            @map("last_synced_at") @db.Timestamptz(3)
-  syncAttemptCount            Int                  @default(0) @map("sync_attempt_count")
-  nextRetryAt                 DateTime?            @map("next_retry_at") @db.Timestamptz(3)
-  syncErrorCode               String?              @map("sync_error_code") @db.VarChar(120)
-  syncErrorMessage            String?              @map("sync_error_message")
+  id                          String                      @id @default(uuid()) @db.Uuid
+  organizationId              String                      @map("organization_id") @db.Uuid
+  meetingLinkId               String                      @map("meeting_link_id") @db.Uuid
+  contactId                   String?                     @map("contact_id") @db.Uuid
+  companyId                   String?                     @map("company_id") @db.Uuid
+  businessUnitId              String?                     @map("business_unit_id") @db.Uuid
+  dealId                      String?                     @map("deal_id") @db.Uuid
+  formSubmissionId            String?                     @map("form_submission_id") @db.Uuid
+  bookingHoldId               String?                     @map("booking_hold_id") @db.Uuid
+  externalSubmissionId        String?                     @map("external_submission_id") @db.VarChar(240)
+  setByUserId                 String?                     @map("set_by_user_id") @db.Uuid
+  hostUserId                  String?                     @map("host_user_id") @db.Uuid
+  assignedUserId              String?                     @map("assigned_user_id") @db.Uuid
+  creditedAppointmentSetterId String?                     @map("credited_appointment_setter_id") @db.Uuid
+  submittedByContactId        String?                     @map("submitted_by_contact_id") @db.Uuid
+  guestName                   String                      @map("guest_name") @db.VarChar(120)
+  guestEmail                  String                      @map("guest_email") @db.VarChar(320)
+  guestPhone                  String?                     @map("guest_phone") @db.VarChar(40)
+  startsAt                    DateTime                    @map("starts_at") @db.Timestamptz(3)
+  endsAt                      DateTime                    @map("ends_at") @db.Timestamptz(3)
+  status                      MeetingBookingStatus        @default(SCHEDULED)
+  bookingStatus               BookingStatus               @default(CONFIRMED) @map("booking_status")
+  syncStatus                  CalendarSyncStatus          @default(NOT_REQUIRED) @map("sync_status")
+  qualificationResult         QualificationResult         @default(UNDETERMINED) @map("qualification_result")
+  appointmentSetAt            DateTime?                   @map("appointment_set_at") @db.Timestamptz(3)
+  attendedAt                  DateTime?                   @map("attended_at") @db.Timestamptz(3)
+  cancelledAt                 DateTime?                   @map("cancelled_at") @db.Timestamptz(3)
+  noShowAt                    DateTime?                   @map("no_show_at") @db.Timestamptz(3)
+  sourceChannel               String?                     @map("source_channel") @db.VarChar(120)
+  territoryId                 String?                     @map("territory_id") @db.Uuid
+  prefectureCode              String?                     @map("prefecture_code") @db.VarChar(2)
+  city                        String?                     @db.VarChar(120)
+  industryId                  String?                     @map("industry_id") @db.Uuid
+  productId                   String?                     @map("product_id") @db.Uuid
+  campaignId                  String?                     @map("campaign_id") @db.Uuid
+  callListId                  String?                     @map("call_list_id") @db.Uuid
+  meetingType                 String?                     @map("meeting_type") @db.VarChar(120)
+  timezone                    String                      @default("Asia/Tokyo") @db.VarChar(80)
+  idempotencyKey              String?                     @map("idempotency_key") @db.VarChar(240)
+  googleCalendarId            String?                     @map("google_calendar_id") @db.VarChar(240)
+  googleEventId               String?                     @map("google_event_id") @db.VarChar(240)
+  googleEventEtag             String?                     @map("google_event_etag") @db.VarChar(240)
+  googleEventHtmlLink         String?                     @map("google_event_html_link")
+  googleEventICalUid          String?                     @map("google_event_ical_uid") @db.VarChar(240)
+  lastSyncedAt                DateTime?                   @map("last_synced_at") @db.Timestamptz(3)
+  syncAttemptCount            Int                         @default(0) @map("sync_attempt_count")
+  nextRetryAt                 DateTime?                   @map("next_retry_at") @db.Timestamptz(3)
+  syncErrorCode               String?                     @map("sync_error_code") @db.VarChar(120)
+  syncErrorMessage            String?                     @map("sync_error_message")
   externalChangeType          CalendarExternalChangeType? @map("external_change_type")
-  externalSyncStatus          CalendarSyncStatus?   @map("external_sync_status")
-  externalChangeDetectedAt    DateTime?             @map("external_change_detected_at") @db.Timestamptz(3)
-  externalChangeSnapshot      Json                  @default("{}") @map("external_change_snapshot") @db.JsonB
-  bookingOrigin               BookingOrigin        @default(INTERNAL) @map("booking_origin")
-  cancelReason                String?              @map("cancel_reason") @db.VarChar(500)
-  legacyMetadata              Json                 @default("{}") @map("legacy_metadata") @db.JsonB
-  createdAt                   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  externalSyncStatus          CalendarSyncStatus?         @map("external_sync_status")
+  externalChangeDetectedAt    DateTime?                   @map("external_change_detected_at") @db.Timestamptz(3)
+  externalChangeSnapshot      Json                        @default("{}") @map("external_change_snapshot") @db.JsonB
+  bookingOrigin               BookingOrigin               @default(INTERNAL) @map("booking_origin")
+  cancelReason                String?                     @map("cancel_reason") @db.VarChar(500)
+  legacyMetadata              Json                        @default("{}") @map("legacy_metadata") @db.JsonB
+  createdAt                   DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meetingLink  MeetingLink  @relation(fields: [meetingLinkId], references: [id], onDelete: Cascade)
   contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@unique([meetingLinkId, startsAt])
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, startsAt])
   @@index([organizationId, businessUnitId, startsAt])
   @@index([organizationId, setByUserId, appointmentSetAt])
@@ -1439,43 +1442,42 @@ model MeetingBooking {
   @@index([organizationId, productId, startsAt])
   @@index([organizationId, campaignId, startsAt])
   @@index([organizationId, callListId, startsAt])
-  @@unique([organizationId, idempotencyKey])
   @@map("meeting_bookings")
 }
 
 model Form {
-  id                             String                  @id @default(uuid()) @db.Uuid
-  organizationId                 String                  @map("organization_id") @db.Uuid
-  businessUnitId                 String?                 @map("business_unit_id") @db.Uuid
-  name                           String                  @db.VarChar(160)
-  description                    String?
-  slug                           String                  @unique @db.VarChar(100)
-  status                         FormStatus              @default(DRAFT)
-  formPurpose                    FormPurpose             @default(PUBLIC_INQUIRY) @map("form_purpose")
-  isInternal                     Boolean                 @default(false) @map("is_internal")
-  isDefaultForBusinessUnit       Boolean                 @default(false) @map("is_default_for_business_unit")
-  fields                         Json                    @default("[]") @db.JsonB
-  mappingSchema                  Json                    @default("{}") @map("mapping_schema") @db.JsonB
-  routingConfig                  Json                    @default("{}") @map("routing_config") @db.JsonB
-  schedulingConfig               Json                    @default("{}") @map("scheduling_config") @db.JsonB
-  submitButtonText               String                  @default("送信する") @map("submit_button_text") @db.VarChar(80)
-  completionMessage              String?                 @map("completion_message")
-  redirectUrl                    String?                 @map("redirect_url")
-  targetProductId                String?                 @map("target_product_id") @db.Uuid
-  pipelineId                     String?                 @map("pipeline_id") @db.Uuid
-  stageId                        String?                 @map("stage_id") @db.Uuid
-  meetingLinkId                  String?                 @map("meeting_link_id") @db.Uuid
-  assignmentMode                 AssignmentMode          @default(ROUND_ROBIN) @map("assignment_mode")
-  fixedAssigneeUserId            String?                 @map("fixed_assignee_user_id") @db.Uuid
-  teamId                         String?                 @map("team_id") @db.Uuid
-  workFunction                   WorkFunction?           @default(IS) @map("work_function")
-  appointmentCreditPolicy        AppointmentCreditPolicy @default(ASSIGNED_USER) @map("appointment_credit_policy")
-  appointmentCreditFixedUserId   String?                 @map("appointment_credit_fixed_user_id") @db.Uuid
-  publishedVersionId             String?                 @map("published_version_id") @db.Uuid
-  privacyConsentVersion          String?                 @map("privacy_consent_version") @db.VarChar(80)
-  googleFallbackMode             String                  @default("crm_only") @map("google_fallback_mode") @db.VarChar(80)
-  createdAt                      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                           String                  @id @default(uuid()) @db.Uuid
+  organizationId               String                  @map("organization_id") @db.Uuid
+  businessUnitId               String?                 @map("business_unit_id") @db.Uuid
+  name                         String                  @db.VarChar(160)
+  description                  String?
+  slug                         String                  @unique @db.VarChar(100)
+  status                       FormStatus              @default(DRAFT)
+  formPurpose                  FormPurpose             @default(PUBLIC_INQUIRY) @map("form_purpose")
+  isInternal                   Boolean                 @default(false) @map("is_internal")
+  isDefaultForBusinessUnit     Boolean                 @default(false) @map("is_default_for_business_unit")
+  fields                       Json                    @default("[]") @db.JsonB
+  mappingSchema                Json                    @default("{}") @map("mapping_schema") @db.JsonB
+  routingConfig                Json                    @default("{}") @map("routing_config") @db.JsonB
+  schedulingConfig             Json                    @default("{}") @map("scheduling_config") @db.JsonB
+  submitButtonText             String                  @default("送信する") @map("submit_button_text") @db.VarChar(80)
+  completionMessage            String?                 @map("completion_message")
+  redirectUrl                  String?                 @map("redirect_url")
+  targetProductId              String?                 @map("target_product_id") @db.Uuid
+  pipelineId                   String?                 @map("pipeline_id") @db.Uuid
+  stageId                      String?                 @map("stage_id") @db.Uuid
+  meetingLinkId                String?                 @map("meeting_link_id") @db.Uuid
+  assignmentMode               AssignmentMode          @default(ROUND_ROBIN) @map("assignment_mode")
+  fixedAssigneeUserId          String?                 @map("fixed_assignee_user_id") @db.Uuid
+  teamId                       String?                 @map("team_id") @db.Uuid
+  workFunction                 WorkFunction?           @default(IS) @map("work_function")
+  appointmentCreditPolicy      AppointmentCreditPolicy @default(ASSIGNED_USER) @map("appointment_credit_policy")
+  appointmentCreditFixedUserId String?                 @map("appointment_credit_fixed_user_id") @db.Uuid
+  publishedVersionId           String?                 @map("published_version_id") @db.Uuid
+  privacyConsentVersion        String?                 @map("privacy_consent_version") @db.VarChar(80)
+  googleFallbackMode           String                  @default("crm_only") @map("google_fallback_mode") @db.VarChar(80)
+  createdAt                    DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   businessUnit BusinessUnit?    @relation(fields: [businessUnitId], references: [id], onDelete: SetNull)
@@ -1487,23 +1489,23 @@ model Form {
 }
 
 model FormVersion {
-  id                       String            @id @default(uuid()) @db.Uuid
-  organizationId           String            @map("organization_id") @db.Uuid
-  businessUnitId           String?           @map("business_unit_id") @db.Uuid
-  formId                   String            @map("form_id") @db.Uuid
-  version                  Int
-  status                   FormVersionStatus @default(DRAFT)
-  nameSnapshot             String            @map("name_snapshot") @db.VarChar(160)
-  descriptionSnapshot      String?           @map("description_snapshot")
-  fieldSchema              Json              @map("field_schema") @db.JsonB
-  mappingSchema            Json              @map("mapping_schema") @db.JsonB
-  routingConfigSnapshot    Json              @map("routing_config_snapshot") @db.JsonB
-  schedulingConfigSnapshot Json              @map("scheduling_config_snapshot") @db.JsonB
-  submitButtonTextSnapshot String            @default("送信する") @map("submit_button_text_snapshot") @db.VarChar(80)
-  completionMessageSnapshot String?          @map("completion_message_snapshot")
-  publishedByUserId        String?           @map("published_by_user_id") @db.Uuid
-  publishedAt              DateTime?         @map("published_at") @db.Timestamptz(3)
-  createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                        String            @id @default(uuid()) @db.Uuid
+  organizationId            String            @map("organization_id") @db.Uuid
+  businessUnitId            String?           @map("business_unit_id") @db.Uuid
+  formId                    String            @map("form_id") @db.Uuid
+  version                   Int
+  status                    FormVersionStatus @default(DRAFT)
+  nameSnapshot              String            @map("name_snapshot") @db.VarChar(160)
+  descriptionSnapshot       String?           @map("description_snapshot")
+  fieldSchema               Json              @map("field_schema") @db.JsonB
+  mappingSchema             Json              @map("mapping_schema") @db.JsonB
+  routingConfigSnapshot     Json              @map("routing_config_snapshot") @db.JsonB
+  schedulingConfigSnapshot  Json              @map("scheduling_config_snapshot") @db.JsonB
+  submitButtonTextSnapshot  String            @default("送信する") @map("submit_button_text_snapshot") @db.VarChar(80)
+  completionMessageSnapshot String?           @map("completion_message_snapshot")
+  publishedByUserId         String?           @map("published_by_user_id") @db.Uuid
+  publishedAt               DateTime?         @map("published_at") @db.Timestamptz(3)
+  createdAt                 DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@unique([formId, version])
   @@index([organizationId, businessUnitId, status])
@@ -1537,10 +1539,10 @@ model FormSubmission {
   form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
   contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, formId, createdAt])
   @@index([organizationId, assignedUserId, createdAt])
   @@index([organizationId, dealId])
-  @@unique([organizationId, idempotencyKey])
   @@map("form_submissions")
 }
 
@@ -1619,26 +1621,26 @@ model BookingHold {
 }
 
 model GoogleCalendarConnection {
-  id                    String                         @id @default(uuid()) @db.Uuid
-  organizationId        String                         @map("organization_id") @db.Uuid
-  userId                String                         @map("user_id") @db.Uuid
-  providerAccountId     String?                        @map("provider_account_id") @db.VarChar(240)
-  googleEmail           String?                        @map("google_email") @db.VarChar(320)
-  status                GoogleCalendarConnectionStatus @default(CONNECTED)
-  encryptedAccessToken  String?                        @map("encrypted_access_token")
-  encryptedRefreshToken String?                        @map("encrypted_refresh_token")
-  encryptionKeyVersion  String                         @default("v1") @map("encryption_key_version") @db.VarChar(40)
-  accessTokenExpiresAt  DateTime?                      @map("access_token_expires_at") @db.Timestamptz(3)
-  grantedScopes         String[]                       @default([]) @map("granted_scopes")
-  selectedWriteCalendarId String?                      @map("selected_write_calendar_id") @db.VarChar(240)
-  selectedWriteCalendarName String?                    @map("selected_write_calendar_name") @db.VarChar(240)
-  lastConnectedAt       DateTime?                      @map("last_connected_at") @db.Timestamptz(3)
-  lastRefreshedAt       DateTime?                      @map("last_refreshed_at") @db.Timestamptz(3)
-  lastErrorCode         String?                        @map("last_error_code") @db.VarChar(120)
-  lastErrorMessage      String?                        @map("last_error_message")
-  revokedAt             DateTime?                      @map("revoked_at") @db.Timestamptz(3)
-  createdAt             DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                        String                         @id @default(uuid()) @db.Uuid
+  organizationId            String                         @map("organization_id") @db.Uuid
+  userId                    String                         @map("user_id") @db.Uuid
+  providerAccountId         String?                        @map("provider_account_id") @db.VarChar(240)
+  googleEmail               String?                        @map("google_email") @db.VarChar(320)
+  status                    GoogleCalendarConnectionStatus @default(CONNECTED)
+  encryptedAccessToken      String?                        @map("encrypted_access_token")
+  encryptedRefreshToken     String?                        @map("encrypted_refresh_token")
+  encryptionKeyVersion      String                         @default("v1") @map("encryption_key_version") @db.VarChar(40)
+  accessTokenExpiresAt      DateTime?                      @map("access_token_expires_at") @db.Timestamptz(3)
+  grantedScopes             String[]                       @default([]) @map("granted_scopes")
+  selectedWriteCalendarId   String?                        @map("selected_write_calendar_id") @db.VarChar(240)
+  selectedWriteCalendarName String?                        @map("selected_write_calendar_name") @db.VarChar(240)
+  lastConnectedAt           DateTime?                      @map("last_connected_at") @db.Timestamptz(3)
+  lastRefreshedAt           DateTime?                      @map("last_refreshed_at") @db.Timestamptz(3)
+  lastErrorCode             String?                        @map("last_error_code") @db.VarChar(120)
+  lastErrorMessage          String?                        @map("last_error_message")
+  revokedAt                 DateTime?                      @map("revoked_at") @db.Timestamptz(3)
+  createdAt                 DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([organizationId, userId])
   @@index([organizationId, status])
@@ -1646,23 +1648,23 @@ model GoogleCalendarConnection {
 }
 
 model GoogleCalendarSelection {
-  id                String   @id @default(uuid()) @db.Uuid
-  connectionId      String   @map("connection_id") @db.Uuid
-  googleCalendarId  String   @map("google_calendar_id") @db.VarChar(240)
-  calendarName      String   @map("calendar_name") @db.VarChar(240)
-  accessRole        String?  @map("access_role") @db.VarChar(80)
-  isWriteCalendar   Boolean  @default(false) @map("is_write_calendar")
-  useForBusyCheck   Boolean  @default(true) @map("use_for_busy_check")
-  timezone          String?  @db.VarChar(80)
-  syncToken         String?  @map("sync_token")
-  syncTokenInvalidatedAt DateTime? @map("sync_token_invalidated_at") @db.Timestamptz(3)
-  lastFullSyncAt    DateTime? @map("last_full_sync_at") @db.Timestamptz(3)
-  lastIncrementalSyncAt DateTime? @map("last_incremental_sync_at") @db.Timestamptz(3)
-  lastSyncStatus    CalendarSyncJobStatus? @map("last_sync_status")
-  lastSyncErrorCode String?  @map("last_sync_error_code") @db.VarChar(120)
-  lastSyncErrorMessage String? @map("last_sync_error_message")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                     String                 @id @default(uuid()) @db.Uuid
+  connectionId           String                 @map("connection_id") @db.Uuid
+  googleCalendarId       String                 @map("google_calendar_id") @db.VarChar(240)
+  calendarName           String                 @map("calendar_name") @db.VarChar(240)
+  accessRole             String?                @map("access_role") @db.VarChar(80)
+  isWriteCalendar        Boolean                @default(false) @map("is_write_calendar")
+  useForBusyCheck        Boolean                @default(true) @map("use_for_busy_check")
+  timezone               String?                @db.VarChar(80)
+  syncToken              String?                @map("sync_token")
+  syncTokenInvalidatedAt DateTime?              @map("sync_token_invalidated_at") @db.Timestamptz(3)
+  lastFullSyncAt         DateTime?              @map("last_full_sync_at") @db.Timestamptz(3)
+  lastIncrementalSyncAt  DateTime?              @map("last_incremental_sync_at") @db.Timestamptz(3)
+  lastSyncStatus         CalendarSyncJobStatus? @map("last_sync_status")
+  lastSyncErrorCode      String?                @map("last_sync_error_code") @db.VarChar(120)
+  lastSyncErrorMessage   String?                @map("last_sync_error_message")
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([connectionId, googleCalendarId])
   @@index([connectionId, isWriteCalendar])
@@ -1670,15 +1672,15 @@ model GoogleCalendarSelection {
 }
 
 model GoogleOAuthState {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  stateHash      String   @unique @map("state_hash") @db.VarChar(64)
-  codeVerifier   String?  @map("code_verifier") @db.VarChar(240)
-  redirectPath   String?  @map("redirect_path") @db.VarChar(500)
-  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  stateHash      String    @unique @map("state_hash") @db.VarChar(64)
+  codeVerifier   String?   @map("code_verifier") @db.VarChar(240)
+  redirectPath   String?   @map("redirect_path") @db.VarChar(500)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
   consumedAt     DateTime? @map("consumed_at") @db.Timestamptz(3)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@index([organizationId, userId, expiresAt])
   @@map("google_oauth_states")
@@ -1686,21 +1688,21 @@ model GoogleOAuthState {
 
 model GoogleCalendarWatchChannel {
   id                    String             @id @default(uuid()) @db.Uuid
-  connectionId           String             @map("connection_id") @db.Uuid
-  googleCalendarId       String             @map("google_calendar_id") @db.VarChar(240)
-  channelId              String             @map("channel_id") @db.VarChar(240)
-  resourceId             String?            @map("resource_id") @db.VarChar(240)
-  encryptedChannelToken  String?            @map("encrypted_channel_token")
-  syncToken              String?            @map("sync_token")
-  status                 WatchChannelStatus @default(ACTIVE)
-  expiresAt              DateTime?          @map("expires_at") @db.Timestamptz(3)
-  lastMessageNumber      BigInt?            @map("last_message_number")
-  notificationCount      Int                @default(0) @map("notification_count")
-  lastRenewalAttemptAt   DateTime?          @map("last_renewal_attempt_at") @db.Timestamptz(3)
-  lastRenewalError       String?            @map("last_renewal_error")
-  lastNotificationAt     DateTime?          @map("last_notification_at") @db.Timestamptz(3)
-  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  connectionId          String             @map("connection_id") @db.Uuid
+  googleCalendarId      String             @map("google_calendar_id") @db.VarChar(240)
+  channelId             String             @map("channel_id") @db.VarChar(240)
+  resourceId            String?            @map("resource_id") @db.VarChar(240)
+  encryptedChannelToken String?            @map("encrypted_channel_token")
+  syncToken             String?            @map("sync_token")
+  status                WatchChannelStatus @default(ACTIVE)
+  expiresAt             DateTime?          @map("expires_at") @db.Timestamptz(3)
+  lastMessageNumber     BigInt?            @map("last_message_number")
+  notificationCount     Int                @default(0) @map("notification_count")
+  lastRenewalAttemptAt  DateTime?          @map("last_renewal_attempt_at") @db.Timestamptz(3)
+  lastRenewalError      String?            @map("last_renewal_error")
+  lastNotificationAt    DateTime?          @map("last_notification_at") @db.Timestamptz(3)
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([channelId])
   @@index([connectionId, googleCalendarId, status])
@@ -1708,22 +1710,22 @@ model GoogleCalendarWatchChannel {
 }
 
 model CalendarSyncJob {
-  id              String                @id @default(uuid()) @db.Uuid
-  organizationId  String                @map("organization_id") @db.Uuid
-  connectionId    String?               @map("connection_id") @db.Uuid
-  selectionId     String?               @map("selection_id") @db.Uuid
-  channelId       String?               @map("channel_id") @db.VarChar(240)
-  jobType         CalendarSyncJobType   @map("job_type")
-  status          CalendarSyncJobStatus @default(PENDING)
-  correlationId   String                @map("correlation_id") @db.VarChar(120)
-  startedAt       DateTime?             @map("started_at") @db.Timestamptz(3)
-  finishedAt      DateTime?             @map("finished_at") @db.Timestamptz(3)
-  processedCount  Int                   @default(0) @map("processed_count")
-  errorCode       String?               @map("error_code") @db.VarChar(120)
-  errorMessage    String?               @map("error_message")
-  metadata        Json                  @default("{}") @db.JsonB
-  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  connectionId   String?               @map("connection_id") @db.Uuid
+  selectionId    String?               @map("selection_id") @db.Uuid
+  channelId      String?               @map("channel_id") @db.VarChar(240)
+  jobType        CalendarSyncJobType   @map("job_type")
+  status         CalendarSyncJobStatus @default(PENDING)
+  correlationId  String                @map("correlation_id") @db.VarChar(120)
+  startedAt      DateTime?             @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?             @map("finished_at") @db.Timestamptz(3)
+  processedCount Int                   @default(0) @map("processed_count")
+  errorCode      String?               @map("error_code") @db.VarChar(120)
+  errorMessage   String?               @map("error_message")
+  metadata       Json                  @default("{}") @db.JsonB
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([organizationId, status, createdAt])
   @@index([connectionId, status])
@@ -1790,18 +1792,18 @@ model AuditLog {
 }
 
 model Product {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  name           String        @db.VarChar(160)
-  normalizedName String        @map("normalized_name") @db.VarChar(160)
-  sku            String?       @db.VarChar(80)
-  description    String?
-  category       String?       @db.VarChar(120)
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  name            String           @db.VarChar(160)
+  normalizedName  String           @map("normalized_name") @db.VarChar(160)
+  sku             String?          @db.VarChar(80)
+  description     String?
+  category        String?          @db.VarChar(120)
   fulfillmentType FulfillmentType? @map("fulfillment_type")
-  status         ProductStatus @default(ACTIVE)
-  metadata       Json          @default("{}") @db.JsonB
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  status          ProductStatus    @default(ACTIVE)
+  metadata        Json             @default("{}") @db.JsonB
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   businessUnitProducts BusinessUnitProduct[]
@@ -1814,20 +1816,20 @@ model Product {
 }
 
 model BusinessUnitProduct {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  businessUnitId String        @map("business_unit_id") @db.Uuid
-  productId      String        @map("product_id") @db.Uuid
-  productKind    ProductKind?  @map("product_kind")
-  fulfillmentType FulfillmentType? @map("fulfillment_type")
-  autoCreateDeliveryProject Boolean @default(false) @map("auto_create_delivery_project")
-  defaultDeliveryProjectTemplateId String? @map("default_delivery_project_template_id") @db.Uuid
-  projectGroupingMode ProjectGroupingMode @default(GROUP_BY_DEAL) @map("project_grouping_mode")
-  status         ProductStatus @default(ACTIVE)
-  displayOrder   Int           @default(0) @map("display_order")
-  metadata       Json          @default("{}") @db.JsonB
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                               String              @id @default(uuid()) @db.Uuid
+  organizationId                   String              @map("organization_id") @db.Uuid
+  businessUnitId                   String              @map("business_unit_id") @db.Uuid
+  productId                        String              @map("product_id") @db.Uuid
+  productKind                      ProductKind?        @map("product_kind")
+  fulfillmentType                  FulfillmentType?    @map("fulfillment_type")
+  autoCreateDeliveryProject        Boolean             @default(false) @map("auto_create_delivery_project")
+  defaultDeliveryProjectTemplateId String?             @map("default_delivery_project_template_id") @db.Uuid
+  projectGroupingMode              ProjectGroupingMode @default(GROUP_BY_DEAL) @map("project_grouping_mode")
+  status                           ProductStatus       @default(ACTIVE)
+  displayOrder                     Int                 @default(0) @map("display_order")
+  metadata                         Json                @default("{}") @db.JsonB
+  createdAt                        DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
@@ -2027,15 +2029,15 @@ model SalesTerritory {
 }
 
 model Industry {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  parentId       String?   @map("parent_id") @db.Uuid
-  code           String    @db.VarChar(80)
-  name           String    @db.VarChar(160)
-  isActive       Boolean   @default(true) @map("is_active")
-  displayOrder   Int       @default(0) @map("display_order")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  parentId       String?  @map("parent_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  name           String   @db.VarChar(160)
+  isActive       Boolean  @default(true) @map("is_active")
+  displayOrder   Int      @default(0) @map("display_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   parent       Industry?    @relation("IndustryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
@@ -2180,12 +2182,13 @@ model MetricDefinition {
   createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  versions     MetricDefinitionVersion[]
-  dailyEntries DailyMetricEntry[]
-  rules        MetricValidationRule[]
-  targets      KpiTarget[]
-  actionPlans  ActionPlan[]
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  versions          MetricDefinitionVersion[]
+  dailyEntries      DailyMetricEntry[]
+  dailyFieldConfigs DailyMetricFieldConfig[]
+  rules             MetricValidationRule[]
+  targets           KpiTarget[]
+  actionPlans       ActionPlan[]
 
   @@unique([organizationId, key])
   @@index([organizationId, businessUnitId, workFunction, isActive])
@@ -2242,11 +2245,31 @@ model DailyMetricEntry {
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
 
+  @@unique([organizationId, businessUnitId, userId, workFunction, metricDefinitionId, targetDate, source, dimensionHash])
   @@index([organizationId, businessUnitId, targetDate])
   @@index([organizationId, metricDefinitionId, targetDate])
   @@index([organizationId, userId, targetDate])
-  @@unique([organizationId, businessUnitId, userId, workFunction, metricDefinitionId, targetDate, source, dimensionHash])
   @@map("daily_metric_entries")
+}
+
+model DailyMetricFieldConfig {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @map("organization_id") @db.Uuid
+  businessUnitId     String       @map("business_unit_id") @db.Uuid
+  workFunction       WorkFunction @map("work_function")
+  metricDefinitionId String       @map("metric_definition_id") @db.Uuid
+  isEnabled          Boolean      @default(true) @map("is_enabled")
+  displayOrder       Int          @default(0) @map("display_order")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit     BusinessUnit     @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, businessUnitId, workFunction, metricDefinitionId])
+  @@index([organizationId, businessUnitId, workFunction, isEnabled, displayOrder])
+  @@map("daily_metric_field_configs")
 }
 
 model MetricValidationRule {
@@ -2514,23 +2537,23 @@ model DeliveryPipelineStage {
 }
 
 model DeliveryProjectTemplate {
-  id                         String   @id @default(uuid()) @db.Uuid
-  organizationId             String   @map("organization_id") @db.Uuid
-  businessUnitId             String?  @map("business_unit_id") @db.Uuid
-  name                       String   @db.VarChar(160)
-  description                String?
-  pipelineId                 String?  @map("pipeline_id") @db.Uuid
-  defaultCsTeamId            String?  @map("default_cs_team_id") @db.Uuid
-  defaultCsUserId            String?  @map("default_cs_user_id") @db.Uuid
-  defaultDueBusinessDays     Int?     @map("default_due_business_days")
-  autoCreate                 Boolean  @default(false) @map("auto_create")
-  handoffRequiredFields      Json     @default("[]") @map("handoff_required_fields") @db.JsonB
-  defaultScope               Json     @default("{}") @map("default_scope") @db.JsonB
-  initialTaskTemplates       Json     @default("[]") @map("initial_task_templates") @db.JsonB
-  stageTaskTemplates         Json     @default("{}") @map("stage_task_templates") @db.JsonB
-  isActive                   Boolean  @default(true) @map("is_active")
-  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                     String   @id @default(uuid()) @db.Uuid
+  organizationId         String   @map("organization_id") @db.Uuid
+  businessUnitId         String?  @map("business_unit_id") @db.Uuid
+  name                   String   @db.VarChar(160)
+  description            String?
+  pipelineId             String?  @map("pipeline_id") @db.Uuid
+  defaultCsTeamId        String?  @map("default_cs_team_id") @db.Uuid
+  defaultCsUserId        String?  @map("default_cs_user_id") @db.Uuid
+  defaultDueBusinessDays Int?     @map("default_due_business_days")
+  autoCreate             Boolean  @default(false) @map("auto_create")
+  handoffRequiredFields  Json     @default("[]") @map("handoff_required_fields") @db.JsonB
+  defaultScope           Json     @default("{}") @map("default_scope") @db.JsonB
+  initialTaskTemplates   Json     @default("[]") @map("initial_task_templates") @db.JsonB
+  stageTaskTemplates     Json     @default("{}") @map("stage_task_templates") @db.JsonB
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([organizationId, businessUnitId, name])
   @@index([organizationId, businessUnitId, isActive])
@@ -2550,42 +2573,42 @@ model DeliveryProjectTemplateProduct {
 }
 
 model DeliveryProject {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  organizationId      String                 @map("organization_id") @db.Uuid
-  businessUnitId      String?                @map("business_unit_id") @db.Uuid
-  companyId           String?                @map("company_id") @db.Uuid
-  primaryContactId    String?                @map("primary_contact_id") @db.Uuid
-  sourceDealId        String?                @map("source_deal_id") @db.Uuid
-  templateId          String?                @map("template_id") @db.Uuid
-  pipelineId          String?                @map("pipeline_id") @db.Uuid
-  stageId             String?                @map("stage_id") @db.Uuid
-  idempotencyKey      String                 @map("idempotency_key") @db.VarChar(240)
-  name                String                 @db.VarChar(200)
-  status              DeliveryProjectStatus  @default(NOT_STARTED)
-  healthStatus        DeliveryHealthStatus   @default(ON_TRACK) @map("health_status")
-  priority            DeliveryPriority       @default(MEDIUM)
-  ownerUserId         String?                @map("owner_user_id") @db.Uuid
-  createdByUserId     String?                @map("created_by_user_id") @db.Uuid
-  expectedStartDate   DateTime?              @map("expected_start_date") @db.Date
-  kickoffDate         DateTime?              @map("kickoff_date") @db.Date
-  expectedPublishDate DateTime?              @map("expected_publish_date") @db.Date
-  actualPublishDate   DateTime?              @map("actual_publish_date") @db.Date
-  completedAt         DateTime?              @map("completed_at") @db.Timestamptz(3)
-  pausedAt            DateTime?              @map("paused_at") @db.Timestamptz(3)
-  pauseReason         String?                @map("pause_reason")
-  nextAction          String?                @map("next_action") @db.VarChar(240)
-  nextActionDate      DateTime?              @map("next_action_date") @db.Date
-  nextActionOwnerId   String?                @map("next_action_owner_id") @db.Uuid
+  id                  String                @id @default(uuid()) @db.Uuid
+  organizationId      String                @map("organization_id") @db.Uuid
+  businessUnitId      String?               @map("business_unit_id") @db.Uuid
+  companyId           String?               @map("company_id") @db.Uuid
+  primaryContactId    String?               @map("primary_contact_id") @db.Uuid
+  sourceDealId        String?               @map("source_deal_id") @db.Uuid
+  templateId          String?               @map("template_id") @db.Uuid
+  pipelineId          String?               @map("pipeline_id") @db.Uuid
+  stageId             String?               @map("stage_id") @db.Uuid
+  idempotencyKey      String                @map("idempotency_key") @db.VarChar(240)
+  name                String                @db.VarChar(200)
+  status              DeliveryProjectStatus @default(NOT_STARTED)
+  healthStatus        DeliveryHealthStatus  @default(ON_TRACK) @map("health_status")
+  priority            DeliveryPriority      @default(MEDIUM)
+  ownerUserId         String?               @map("owner_user_id") @db.Uuid
+  createdByUserId     String?               @map("created_by_user_id") @db.Uuid
+  expectedStartDate   DateTime?             @map("expected_start_date") @db.Date
+  kickoffDate         DateTime?             @map("kickoff_date") @db.Date
+  expectedPublishDate DateTime?             @map("expected_publish_date") @db.Date
+  actualPublishDate   DateTime?             @map("actual_publish_date") @db.Date
+  completedAt         DateTime?             @map("completed_at") @db.Timestamptz(3)
+  pausedAt            DateTime?             @map("paused_at") @db.Timestamptz(3)
+  pauseReason         String?               @map("pause_reason")
+  nextAction          String?               @map("next_action") @db.VarChar(240)
+  nextActionDate      DateTime?             @map("next_action_date") @db.Date
+  nextActionOwnerId   String?               @map("next_action_owner_id") @db.Uuid
   blocker             String?
-  lastActivityAt      DateTime?              @map("last_activity_at") @db.Timestamptz(3)
-  handoffStatus       DeliveryHandoffStatus  @default(DRAFT) @map("handoff_status")
-  scopeVersion        Int                    @default(1) @map("scope_version")
-  scopeSyncStatus     ScopeSyncStatus        @default(SYNCED) @map("scope_sync_status")
-  scopeSnapshot       Json                   @default("{}") @map("scope_snapshot") @db.JsonB
-  handoffChecklist    Json                   @default("{}") @map("handoff_checklist") @db.JsonB
-  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt           DateTime?              @map("deleted_at") @db.Timestamptz(3)
+  lastActivityAt      DateTime?             @map("last_activity_at") @db.Timestamptz(3)
+  handoffStatus       DeliveryHandoffStatus @default(DRAFT) @map("handoff_status")
+  scopeVersion        Int                   @default(1) @map("scope_version")
+  scopeSyncStatus     ScopeSyncStatus       @default(SYNCED) @map("scope_sync_status")
+  scopeSnapshot       Json                  @default("{}") @map("scope_snapshot") @db.JsonB
+  handoffChecklist    Json                  @default("{}") @map("handoff_checklist") @db.JsonB
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
   items        DeliveryProjectItem[]
   handoffs     DeliveryHandoff[]
@@ -2600,22 +2623,22 @@ model DeliveryProject {
 }
 
 model DeliveryProjectItem {
-  id                         String             @id @default(uuid()) @db.Uuid
-  organizationId             String             @map("organization_id") @db.Uuid
-  businessUnitId             String?            @map("business_unit_id") @db.Uuid
-  deliveryProjectId          String             @map("delivery_project_id") @db.Uuid
-  sourceDealLineItemId       String?            @map("source_deal_line_item_id") @db.Uuid
-  splitKey                   String             @default("default") @map("split_key") @db.VarChar(80)
-  productId                  String?            @map("product_id") @db.Uuid
-  productCodeSnapshot        String?            @map("product_code_snapshot") @db.VarChar(80)
-  productNameSnapshot        String             @map("product_name_snapshot") @db.VarChar(180)
-  quantitySnapshot           Decimal            @map("quantity_snapshot") @db.Decimal(18, 4)
-  revenueAmountSnapshot      Decimal?           @map("revenue_amount_snapshot") @db.Decimal(18, 2)
-  grossProfitAmountSnapshot  Decimal?           @map("gross_profit_amount_snapshot") @db.Decimal(18, 2)
-  customFieldsSnapshot       Json               @default("{}") @map("custom_fields_snapshot") @db.JsonB
-  deliveryStatus             DeliveryItemStatus @default(NOT_STARTED) @map("delivery_status")
-  createdAt                  DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                        String             @id @default(uuid()) @db.Uuid
+  organizationId            String             @map("organization_id") @db.Uuid
+  businessUnitId            String?            @map("business_unit_id") @db.Uuid
+  deliveryProjectId         String             @map("delivery_project_id") @db.Uuid
+  sourceDealLineItemId      String?            @map("source_deal_line_item_id") @db.Uuid
+  splitKey                  String             @default("default") @map("split_key") @db.VarChar(80)
+  productId                 String?            @map("product_id") @db.Uuid
+  productCodeSnapshot       String?            @map("product_code_snapshot") @db.VarChar(80)
+  productNameSnapshot       String             @map("product_name_snapshot") @db.VarChar(180)
+  quantitySnapshot          Decimal            @map("quantity_snapshot") @db.Decimal(18, 4)
+  revenueAmountSnapshot     Decimal?           @map("revenue_amount_snapshot") @db.Decimal(18, 2)
+  grossProfitAmountSnapshot Decimal?           @map("gross_profit_amount_snapshot") @db.Decimal(18, 2)
+  customFieldsSnapshot      Json               @default("{}") @map("custom_fields_snapshot") @db.JsonB
+  deliveryStatus            DeliveryItemStatus @default(NOT_STARTED) @map("delivery_status")
+  createdAt                 DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   deliveryProject DeliveryProject @relation(fields: [deliveryProjectId], references: [id], onDelete: Cascade)
 

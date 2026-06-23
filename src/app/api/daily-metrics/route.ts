@@ -2,11 +2,16 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { apiError, getRequestMetadata } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { assertBusinessUnitAccess } from "@/lib/business-units";
+import {
+  assertDailyMetricEntryAccess,
+  canManageDailyMetricEntries,
+  getDailyMetricScope,
+  getEnabledDailyMetricFieldConfigs,
+} from "@/lib/daily-metric-fields";
 import { dimensionHash, dimensionsJson, normalizeDimensions } from "@/lib/dimensions";
+import { jstDateOnly } from "@/lib/jst-date";
 import {
   AuthorizationError,
-  hasPermission,
   Permission,
   requirePermission,
 } from "@/lib/permissions";
@@ -21,27 +26,45 @@ export async function GET(request: Request) {
     requirePermission(context.membership.role, Permission.CRM_READ);
     const url = new URL(request.url);
     const query = metricQuerySchema.parse(Object.fromEntries(url.searchParams));
-    const targetDate = query.periodStart ?? new Date();
-    const definitions = await prisma.metricDefinition.findMany({
-      where: {
-        organizationId: context.organization.id,
-        sourceType: "MANUAL_DAILY",
-        isActive: true,
-        ...(query.businessUnitId
-          ? { OR: [{ businessUnitId: query.businessUnitId }, { businessUnitId: null }] }
-          : {}),
-        ...(query.workFunction
-          ? { OR: [{ workFunction: query.workFunction }, { workFunction: null }] }
-          : {}),
-      },
-      orderBy: [{ displayOrder: "asc" }],
+    const canManage = canManageDailyMetricEntries(context);
+    const scope = await getDailyMetricScope({
+      context,
+      requestedBusinessUnitId: query.businessUnitId,
+      requestedWorkFunction: query.workFunction,
+      canManage,
     });
+    if (!scope.selectedBusinessUnitId) {
+      return NextResponse.json({ message: "事業部が見つかりません。" }, { status: 403 });
+    }
+    const targetDate = query.periodStart
+      ? jstDateOnly(query.periodStart.toISOString().slice(0, 10))
+      : jstDateOnly(new Date().toISOString().slice(0, 10));
+    const configs = await getEnabledDailyMetricFieldConfigs({
+      organizationId: context.organization.id,
+      businessUnitId: scope.selectedBusinessUnitId,
+      workFunction: scope.selectedWorkFunction,
+    });
+    const definitions = configs.map((config) => config.metricDefinition);
+    const targetUserId = query.userId ?? context.user.id;
+    if (
+      !(await assertDailyMetricEntryAccess({
+        context,
+        businessUnitId: scope.selectedBusinessUnitId,
+        workFunction: scope.selectedWorkFunction,
+        targetUserId,
+        canManage,
+      }))
+    ) {
+      return NextResponse.json({ message: "この担当者の日次実績を操作できません。" }, { status: 403 });
+    }
     const entries = await prisma.dailyMetricEntry.findMany({
       where: {
         organizationId: context.organization.id,
         targetDate,
         metricDefinitionId: { in: definitions.map((definition) => definition.id) },
-        ...(query.userId ? { userId: query.userId } : { userId: context.user.id }),
+        businessUnitId: scope.selectedBusinessUnitId,
+        workFunction: scope.selectedWorkFunction,
+        userId: targetUserId,
       },
     });
     return NextResponse.json({ definitions, entries });
@@ -57,20 +80,42 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
     requirePermission(context.membership.role, Permission.CRM_WRITE);
     const input = dailyMetricsPutSchema.parse(await request.json());
-    if (!(await assertBusinessUnitAccess(context, input.businessUnitId))) {
-      return NextResponse.json({ message: "事業部が見つかりません。" }, { status: 403 });
-    }
+    const canManage = canManageDailyMetricEntries(context);
     const targetUserId = input.userId ?? context.user.id;
-    if (context.membership.role === "USER" && targetUserId !== context.user.id) {
+    if (
+      !(await assertDailyMetricEntryAccess({
+        context,
+        businessUnitId: input.businessUnitId,
+        workFunction: input.workFunction,
+        targetUserId,
+        canManage,
+      }))
+    ) {
       return NextResponse.json(
-        { message: "他人の日次実績は変更できません。" },
+        { message: "この担当者の日次実績を操作できません。" },
         { status: 403 },
+      );
+    }
+    const configs = await getEnabledDailyMetricFieldConfigs({
+      organizationId: context.organization.id,
+      businessUnitId: input.businessUnitId,
+      workFunction: input.workFunction,
+    });
+    const allowedMetricIds = new Set(configs.map((config) => config.metricDefinitionId));
+    const invalidEntry = input.entries.find(
+      (entry) => !allowedMetricIds.has(entry.metricDefinitionId),
+    );
+    if (invalidEntry) {
+      return NextResponse.json(
+        { message: "この事業部・職種では使用できない日次入力項目です。" },
+        { status: 400 },
       );
     }
     const metadata = getRequestMetadata(request);
     const hash = dimensionHash(input.dimensions);
     const normalizedDimensions = normalizeDimensions(input.dimensions);
     const normalizedDimensionsJson = dimensionsJson(input.dimensions);
+    const targetDate = jstDateOnly(input.targetDate.toISOString().slice(0, 10));
     const items = await prisma.$transaction(async (tx) => {
       const results = [];
       for (const entry of input.entries) {
@@ -79,6 +124,7 @@ export async function PUT(request: Request) {
             id: entry.metricDefinitionId,
             organizationId: context.organization.id,
             sourceType: "MANUAL_DAILY",
+            isActive: true,
           },
         });
         if (!definition) throw new Error("日次入力対象のKPIが見つかりません。");
@@ -87,7 +133,7 @@ export async function PUT(request: Request) {
             organizationId: context.organization.id,
             businessUnitId: input.businessUnitId,
             workFunction: input.workFunction,
-            targetDate: input.targetDate,
+            targetDate,
             userId: targetUserId,
             metricDefinitionId: entry.metricDefinitionId,
             dimensionHash: hash,
@@ -100,7 +146,7 @@ export async function PUT(request: Request) {
         }
         if (
           existing?.status === "APPROVED" &&
-          !hasPermission(context.membership.role, Permission.MANAGE_TARGETS)
+          !canManage
         ) {
           throw new AuthorizationError(
             "承認済みの日次実績は管理者のみ変更できます。",
@@ -122,7 +168,7 @@ export async function PUT(request: Request) {
                 organizationId: context.organization.id,
                 businessUnitId: input.businessUnitId,
                 workFunction: input.workFunction,
-                targetDate: input.targetDate,
+                targetDate,
                 userId: targetUserId,
                 metricDefinitionId: entry.metricDefinitionId,
                 value: entry.value,
