@@ -561,6 +561,7 @@ export const meetingBookingSchema = z.object({
 
 export const appointmentCreateSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(240),
+  formVersionId: optionalUuid,
   businessUnitId: z.string().uuid("事業部を選択してください。"),
   appointmentSetterUserId: optionalUuid,
   assignedFsUserId: optionalUuid,
@@ -644,6 +645,7 @@ export const appointmentCreateSchema = z.object({
   promises: optionalText(2000),
   handoffNotes: optionalText(4000),
   communicationNotes: optionalText(2000),
+  customFields: z.record(z.string(), z.unknown()).default({}),
 }).refine((value) => value.scheduledStartAt < value.scheduledEndAt, {
   message: "商談終了時刻は開始時刻より後にしてください。",
 });

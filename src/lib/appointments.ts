@@ -9,6 +9,11 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { BadRequestError } from "./api";
+import {
+  ensureInternalAppointmentFormConfig,
+  getPublishedInternalAppointmentFormConfig,
+  validateAppointmentPayloadAgainstSchema,
+} from "./appointment-form-config";
 import { AuthContext } from "./auth";
 import { assertBusinessUnitAccess } from "./business-units";
 import { createRecordActivity } from "./crm";
@@ -23,6 +28,31 @@ type AppointmentInput = z.infer<typeof appointmentCreateSchema>;
 
 function inputJson(value: unknown) {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function customByObject(input: AppointmentInput, objectType: string) {
+  const customFields = asObject(input.customFields);
+  return Object.fromEntries(
+    Object.entries(customFields).filter(([, value]) => {
+      if (!asObject(value).crmObject) return false;
+      return asObject(value).crmObject === objectType;
+    }),
+  );
+}
+
+function customValues(input: AppointmentInput, objectType: string) {
+  return Object.fromEntries(
+    Object.entries(customByObject(input, objectType)).map(([key, value]) => [
+      key,
+      asObject(value).value,
+    ]),
+  );
 }
 
 function clean(value: string | null | undefined) {
@@ -50,97 +80,6 @@ function firstAndLastName(fullName: string) {
     return { lastName: parts[0], firstName: parts.slice(1).join(" ") };
   }
   return { lastName: fullName.trim(), firstName: null };
-}
-
-function appointmentFields() {
-  const required = [
-    "businessUnitId",
-    "appointmentSetterUserId",
-    "companyName",
-    "prefectureCode",
-    "industryId",
-    "primaryProductId",
-    "appointmentAcquiredAt",
-    "scheduledStartAt",
-    "scheduledEndAt",
-    "assignmentMode",
-    "decisionMakerStatus",
-    "sourceChannel",
-  ];
-  return required.map((name, index) => ({
-    name,
-    label: name,
-    type: name.endsWith("At") ? "datetime" : "text",
-    required: true,
-    systemRequired: true,
-    sortOrder: index,
-  }));
-}
-
-async function ensureInternalAppointmentForm(
-  tx: Prisma.TransactionClient,
-  input: {
-    organizationId: string;
-    businessUnitId: string;
-    userId: string;
-  },
-) {
-  const slug = `internal-appointment-${input.organizationId.slice(0, 8)}-${input.businessUnitId.slice(0, 8)}`;
-  const form = await tx.form.upsert({
-    where: { slug },
-    create: {
-      organizationId: input.organizationId,
-      businessUnitId: input.businessUnitId,
-      name: "ISアポ登録",
-      slug,
-      status: "PUBLISHED",
-      formPurpose: "INTERNAL_APPOINTMENT",
-      isInternal: true,
-      isDefaultForBusinessUnit: true,
-      fields: inputJson(appointmentFields()),
-      mappingSchema: {},
-      routingConfig: {},
-      schedulingConfig: {},
-      submitButtonText: "アポを登録",
-      completionMessage: "アポを登録しました。",
-    },
-    update: {
-      businessUnitId: input.businessUnitId,
-      status: "PUBLISHED",
-      formPurpose: "INTERNAL_APPOINTMENT",
-      isInternal: true,
-      isDefaultForBusinessUnit: true,
-    },
-  });
-  if (form.publishedVersionId) return { form, formVersionId: form.publishedVersionId };
-  const latest = await tx.formVersion.aggregate({
-    where: { formId: form.id },
-    _max: { version: true },
-  });
-  const version = await tx.formVersion.create({
-    data: {
-      organizationId: input.organizationId,
-      businessUnitId: input.businessUnitId,
-      formId: form.id,
-      version: (latest._max.version ?? 0) + 1,
-      status: "PUBLISHED",
-      nameSnapshot: form.name,
-      descriptionSnapshot: form.description,
-      fieldSchema: inputJson(form.fields),
-      mappingSchema: inputJson(form.mappingSchema),
-      routingConfigSnapshot: inputJson(form.routingConfig),
-      schedulingConfigSnapshot: inputJson(form.schedulingConfig),
-      submitButtonTextSnapshot: form.submitButtonText,
-      completionMessageSnapshot: form.completionMessage,
-      publishedByUserId: input.userId,
-      publishedAt: new Date(),
-    },
-  });
-  await tx.form.update({
-    where: { id: form.id },
-    data: { publishedVersionId: version.id },
-  });
-  return { form, formVersionId: version.id };
 }
 
 async function pipelineForAppointment(
@@ -293,7 +232,7 @@ async function findOrCreateCompany(
     prefecture: input.prefectureName,
     postalCode: input.postalCode,
     websiteUrl: input.websiteUrl,
-    customFields: inputJson({
+    customFields: {
       storeName: input.storeName,
       prefectureCode: input.prefectureCode,
       industryId: input.industryId,
@@ -301,11 +240,23 @@ async function findOrCreateCompany(
       businessType: input.businessType,
       storeCount: input.storeCount,
       customerStatus: input.customerStatus,
-    }),
+      ...customValues(input, "COMPANY"),
+    },
   };
   return existing
-    ? tx.company.update({ where: { id: existing.id }, data })
-    : tx.company.create({ data: { organizationId, ...data } });
+    ? tx.company.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          customFields: inputJson({
+            ...asObject(existing.customFields),
+            ...data.customFields,
+          }),
+        },
+      })
+    : tx.company.create({
+        data: { organizationId, ...data, customFields: inputJson(data.customFields) },
+      });
 }
 
 async function findOrCreateContact(
@@ -348,23 +299,50 @@ async function findOrCreateContact(
     jobTitle: input.jobTitle,
     source: input.sourceChannel,
     memo: input.communicationNotes,
-    customFields: inputJson({
+    customFields: {
       companyId,
       kana: input.contactKana,
       decisionMakerStatus: input.decisionMakerStatus,
       preferredContactMethod: input.preferredContactMethod,
-    }),
+      ...customValues(input, "CONTACT"),
+    },
   };
   return existing
-    ? tx.contact.update({ where: { id: existing.id }, data })
-    : tx.contact.create({ data: { organizationId, ...data } });
+    ? tx.contact.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          customFields: inputJson({
+            ...asObject(existing.customFields),
+            ...data.customFields,
+          }),
+        },
+      })
+    : tx.contact.create({
+        data: { organizationId, ...data, customFields: inputJson(data.customFields) },
+      });
 }
 
 export async function createInternalAppointment(
   context: AuthContext,
   rawInput: unknown,
 ) {
-  const input = appointmentCreateSchema.parse(rawInput);
+  const raw = asObject(rawInput);
+  const businessUnitId = typeof raw.businessUnitId === "string" ? raw.businessUnitId : "";
+  if (!businessUnitId) throw new BadRequestError("事業部を選択してください。");
+  const publishedForm = await getPublishedInternalAppointmentFormConfig(prisma, {
+    organizationId: context.organization.id,
+    businessUnitId,
+    userId: context.user.id,
+  });
+  const validatedPayload = validateAppointmentPayloadAgainstSchema(
+    publishedForm.schema,
+    raw,
+  );
+  const input = appointmentCreateSchema.parse({
+    ...validatedPayload,
+    formVersionId: publishedForm.version.id,
+  });
   if (!(await assertBusinessUnitAccess(context, input.businessUnitId))) {
     throw new BadRequestError("事業部が見つかりません。");
   }
@@ -422,7 +400,7 @@ export async function createInternalAppointment(
         context.organization.id,
         input,
       );
-      const { form, formVersionId } = await ensureInternalAppointmentForm(tx, {
+      const { form, formVersionId } = await ensureInternalAppointmentFormConfig(tx, {
         organizationId: context.organization.id,
         businessUnitId: input.businessUnitId,
         userId: context.user.id,
@@ -461,6 +439,7 @@ export async function createInternalAppointment(
           nextAction: "初回商談",
           nextActionDate: input.scheduledStartAt,
           customFields: inputJson({
+            ...customValues(input, "DEAL"),
             appointmentAcquiredAt: input.appointmentAcquiredAt,
             scheduledStartAt: input.scheduledStartAt,
             scheduledEndAt: input.scheduledEndAt,
@@ -537,6 +516,7 @@ export async function createInternalAppointment(
             quantity: 1,
             status: "PROPOSED",
             source: "INTERNAL_APPOINTMENT",
+            customFields: inputJson(index === 0 ? customValues(input, "DEAL_LINE_ITEM") : {}),
             metadata: inputJson({ primary: index === 0 }),
           };
         }),
@@ -594,6 +574,10 @@ export async function createInternalAppointment(
             assignmentMode: input.assignmentMode,
             assignedFsUserId,
           }),
+          consentSnapshot: inputJson({
+            internalAppointmentFormVersionId: formVersionId,
+            customFields: customValues(input, "FORM_SUBMISSION"),
+          }),
         },
       });
       const booking = await tx.meetingBooking.create({
@@ -636,6 +620,7 @@ export async function createInternalAppointment(
           externalSubmissionId: input.idempotencyKey,
           bookingOrigin: BookingOrigin.INTERNAL,
           legacyMetadata: inputJson({
+            customFields: customValues(input, "MEETING_BOOKING"),
             storeName: input.storeName,
             meetingPurpose: input.meetingPurpose,
             handoff: {

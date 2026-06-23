@@ -4,6 +4,10 @@ import { PageHeading } from "@/components/ui/page-heading";
 import { getAuthContext } from "@/lib/auth";
 import { getAccessibleBusinessUnits } from "@/lib/business-units";
 import {
+  ensureInternalAppointmentFormConfig,
+  getPublishedInternalAppointmentFormConfig,
+} from "@/lib/appointment-form-config";
+import {
   canAdministrateInternalAppointments,
   canCreateInternalAppointment,
   getInternalAppointmentUsers,
@@ -44,6 +48,7 @@ export default async function NewAppointmentPage() {
     campaigns,
     callLists,
     companies,
+    formConfigs,
   ] = await Promise.all([
     getInternalAppointmentUsers({
       organizationId: context.organization.id,
@@ -71,18 +76,16 @@ export default async function NewAppointmentPage() {
       where: {
         organizationId: context.organization.id,
         isActive: true,
-        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, businessUnitId: true },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
     }),
     prisma.outboundCampaign.findMany({
       where: {
         organizationId: context.organization.id,
         status: "ACTIVE",
-        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, businessUnitId: true },
       orderBy: [{ name: "asc" }],
     }),
     prisma.callList.findMany({
@@ -99,6 +102,7 @@ export default async function NewAppointmentPage() {
         prefectureCode: true,
         industryId: true,
         productId: true,
+        businessUnitId: true,
       },
       orderBy: [{ name: "asc" }],
     }),
@@ -108,6 +112,25 @@ export default async function NewAppointmentPage() {
       orderBy: { updatedAt: "desc" },
       take: 50,
     }),
+    Promise.all(
+      businessUnits.map(async (unit) => {
+        await ensureInternalAppointmentFormConfig(prisma, {
+          organizationId: context.organization.id,
+          businessUnitId: unit.id,
+          userId: context.user.id,
+        });
+        const config = await getPublishedInternalAppointmentFormConfig(prisma, {
+          organizationId: context.organization.id,
+          businessUnitId: unit.id,
+          userId: context.user.id,
+        });
+        return {
+          businessUnitId: unit.id,
+          formVersionId: config.version.id,
+          schema: config.schema,
+        };
+      }),
+    ),
   ]);
 
   return (
@@ -133,6 +156,7 @@ export default async function NewAppointmentPage() {
         campaigns={campaigns}
         callLists={callLists}
         companies={companies}
+        formConfigs={formConfigs}
       />
     </div>
   );

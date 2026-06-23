@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { AppointmentFormField, AppointmentFormSchema } from "@/lib/appointment-form-config";
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; businessUnitId?: string | null };
 type UserOption = Option & { businessUnitId: string };
 type ProductOption = Option & { businessUnitIds: string[] };
 type CallListOption = Option & {
@@ -13,6 +14,7 @@ type CallListOption = Option & {
   prefectureCode: string | null;
   industryId: string | null;
   productId: string | null;
+  businessUnitId: string | null;
 };
 type CreatedLinks = {
   companyId: string | null;
@@ -20,6 +22,11 @@ type CreatedLinks = {
   dealId: string | null;
   meetingBookingId: string | null;
   duplicated?: boolean;
+};
+type AppointmentFormConfig = {
+  businessUnitId: string;
+  formVersionId: string;
+  schema: AppointmentFormSchema;
 };
 
 const prefectures = [
@@ -43,7 +50,8 @@ function value(form: FormData, name: string) {
 }
 
 function bool(form: FormData, name: string) {
-  return form.get(name) === "on";
+  const raw = form.get(name);
+  return raw === "on" || raw === "true";
 }
 
 function toDateTime(date: string, time: string) {
@@ -68,6 +76,7 @@ export function AppointmentForm({
   campaigns,
   callLists,
   companies,
+  formConfigs,
 }: {
   businessUnits: Option[];
   selectedBusinessUnitId: string;
@@ -80,6 +89,7 @@ export function AppointmentForm({
   campaigns: Option[];
   callLists: CallListOption[];
   companies: Option[];
+  formConfigs: AppointmentFormConfig[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -90,6 +100,11 @@ export function AppointmentForm({
   const [businessUnitId, setBusinessUnitId] = useState(selectedBusinessUnitId);
   const [appointmentSetterUserId, setAppointmentSetterUserId] = useState(currentUserId);
   const [assignedFsUserId, setAssignedFsUserId] = useState("");
+  const currentConfig = useMemo(
+    () => formConfigs.find((item) => item.businessUnitId === businessUnitId) ?? formConfigs[0],
+    [businessUnitId, formConfigs],
+  );
+  const currentSchema = currentConfig?.schema;
   const selectedCallList = useMemo(
     () => callLists.find((item) => item.id === selectedCallListId) ?? null,
     [callLists, selectedCallListId],
@@ -123,6 +138,7 @@ export function AppointmentForm({
       prefectures.find(([code]) => code === prefectureCode)?.[1] ?? "";
     const body = {
       idempotencyKey: value(form, "idempotencyKey"),
+      formVersionId: currentConfig?.formVersionId,
       businessUnitId,
       appointmentSetterUserId,
       assignedFsUserId,
@@ -180,6 +196,19 @@ export function AppointmentForm({
       handoffNotes: value(form, "handoffNotes"),
       communicationNotes: value(form, "communicationNotes"),
     };
+    const dynamicValues: Record<string, unknown> = {};
+    for (const field of currentSchema?.fields ?? []) {
+      if (!field.isEnabled) continue;
+      if (field.isCustom) {
+        dynamicValues[field.fieldKey] =
+          field.fieldType === "MULTI_SELECT"
+            ? form.getAll(field.fieldKey).map(String).filter(Boolean)
+            : field.fieldType === "CHECKBOX"
+              ? bool(form, field.fieldKey)
+              : value(form, field.fieldKey);
+      }
+    }
+    Object.assign(body, dynamicValues, { customFields: dynamicValues });
     setPending(true);
     setError("");
     setCreated(null);
@@ -196,6 +225,154 @@ export function AppointmentForm({
     }
     setCreated(result);
     router.refresh();
+  }
+
+  function fieldValue(field: AppointmentFormField) {
+    if (field.fieldKey === "businessUnitId") return businessUnitId;
+    if (field.fieldKey === "appointmentSetterUserId") return appointmentSetterUserId;
+    if (field.fieldKey === "assignedFsUserId") return assignedFsUserId;
+    if (field.fieldKey === "appointmentAcquiredAt") return nowLocalDateTime();
+    if (field.fieldKey === "campaignId") return selectedCallList?.campaignId ?? field.defaultValue ?? "";
+    if (field.fieldKey === "prefectureCode") return selectedCallList?.prefectureCode ?? field.defaultValue ?? "";
+    if (field.fieldKey === "territoryId") return selectedCallList?.territoryId ?? field.defaultValue ?? "";
+    if (field.fieldKey === "industryId") return selectedCallList?.industryId ?? field.defaultValue ?? "";
+    if (field.fieldKey === "primaryProductId") return selectedCallList?.productId ?? field.defaultValue ?? "";
+    return field.defaultValue ?? "";
+  }
+
+  function optionsFor(field: AppointmentFormField) {
+    if (field.fieldKey === "businessUnitId") return businessUnits.map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "appointmentSetterUserId") return filteredIsUsers.map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "assignedFsUserId") return filteredFsUsers.map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "callListId") return callLists.filter((item) => !item.businessUnitId || item.businessUnitId === businessUnitId).map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "campaignId") return campaigns.filter((item) => !item.businessUnitId || item.businessUnitId === businessUnitId).map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "companyId") return companies.map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "prefectureCode") return prefectures.map(([value, label]) => ({ value, label }));
+    if (field.fieldKey === "territoryId") return territories.filter((item) => !item.businessUnitId || item.businessUnitId === businessUnitId).map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "industryId") return industries.map((item) => ({ value: item.id, label: item.name }));
+    if (field.fieldKey === "primaryProductId" || field.fieldKey === "additionalProductIds") {
+      return products
+        .filter((item) => !item.businessUnitIds.length || item.businessUnitIds.includes(businessUnitId))
+        .map((item) => ({ value: item.id, label: item.name }));
+    }
+    return field.options ?? [];
+  }
+
+  function renderDynamicField(field: AppointmentFormField) {
+    if (!field.isEnabled) return null;
+    if (!field.isVisible) {
+      if (field.defaultValue === undefined || field.defaultValue === "") return null;
+      return <input key={field.fieldKey} type="hidden" name={field.fieldKey} value={String(field.defaultValue)} />;
+    }
+    const label = (
+      <span className="field-label">
+        {field.label}
+        {field.required ? <span className="text-red-500"> *</span> : null}
+      </span>
+    );
+    const common = { name: field.fieldKey, required: field.required, placeholder: field.placeholder ?? "" };
+    if (field.fieldKey === "businessUnitId") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select
+            className="text-field"
+            name="businessUnitId"
+            value={businessUnitId}
+            onChange={(event) => {
+              if (event.target.value !== businessUnitId && !confirm("事業部を変更すると入力済みの値が破棄される場合があります。変更しますか？")) return;
+              setBusinessUnitId(event.target.value);
+              setSelectedCallListId("");
+            }}
+            required
+          >
+            {businessUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.fieldKey === "appointmentSetterUserId") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select className="text-field" name={field.fieldKey} value={appointmentSetterUserId} onChange={(event) => setAppointmentSetterUserId(event.target.value)} required>
+            <option value="">選択してください</option>
+            {filteredIsUsers.map((user) => <option key={`${user.businessUnitId}:${user.id}`} value={user.id}>{user.name}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.fieldKey === "assignedFsUserId") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select className="text-field" name={field.fieldKey} value={assignedFsUserId} onChange={(event) => setAssignedFsUserId(event.target.value)}>
+            <option value="">未割当/自動割当</option>
+            {filteredFsUsers.map((user) => <option key={`${user.businessUnitId}:${user.id}`} value={user.id}>{user.name}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.fieldKey === "sourceChannel") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select className="text-field" name={field.fieldKey} value={sourceChannel} onChange={(event) => setSourceChannel(event.target.value)}>
+            {optionsFor(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.fieldKey === "callListId") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select className="text-field" name={field.fieldKey} value={selectedCallListId} onChange={(event) => setSelectedCallListId(event.target.value)}>
+            <option value="">選択なし</option>
+            {optionsFor(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.conditionalDisplay && field.conditionalDisplay.fieldKey === "sourceChannel" && sourceChannel !== field.conditionalDisplay.equals) return null;
+    if (field.fieldType === "TEXTAREA") {
+      return <label key={field.fieldKey} className="md:col-span-2">{label}<textarea className="text-field min-h-24" {...common} defaultValue={String(fieldValue(field) ?? "")} /></label>;
+    }
+    if (field.fieldType === "CHECKBOX") {
+      return <label key={field.fieldKey} className="flex items-center gap-2 text-sm font-bold text-slate-600"><input name={field.fieldKey} type="checkbox" defaultChecked={Boolean(field.defaultValue)} />{field.label}</label>;
+    }
+    if (field.fieldType === "SELECT" || field.fieldType === "USER" || field.fieldType === "BUSINESS_UNIT" || field.fieldType === "PRODUCT") {
+      return (
+        <label key={field.fieldKey}>
+          {label}
+          <select className="text-field" {...common} defaultValue={String(fieldValue(field) ?? "")}>
+            {!field.required ? <option value="">未設定</option> : <option value="">選択してください</option>}
+            {optionsFor(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      );
+    }
+    if (field.fieldType === "MULTI_SELECT") {
+      return (
+        <label key={field.fieldKey} className="md:col-span-2">
+          {label}
+          <select className="text-field min-h-28" name={field.fieldKey} multiple>
+            {optionsFor(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      );
+    }
+    return (
+      <label key={field.fieldKey}>
+        {label}
+        <input
+          className="text-field"
+          {...common}
+          type={field.fieldType === "EMAIL" ? "email" : field.fieldType === "URL" ? "url" : field.fieldType === "PHONE" ? "tel" : field.fieldType === "NUMBER" ? "number" : field.fieldType === "DATE" ? "date" : field.fieldType === "DATETIME" ? "datetime-local" : field.fieldType === "TIME" ? "time" : "text"}
+          defaultValue={String(fieldValue(field) ?? "")}
+        />
+      </label>
+    );
   }
 
   return (
@@ -224,6 +401,24 @@ export function AppointmentForm({
         </div>
       ) : null}
 
+      {(currentSchema?.sections ?? []).sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => {
+        const fields = (currentSchema?.fields ?? [])
+          .filter((field) => field.sectionId === section.id)
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        if (!fields.length) return null;
+        return (
+          <section key={section.id} className="card p-5">
+            <h2 className="text-base font-bold">{index + 1}. {section.title}</h2>
+            {section.description ? <p className="mt-1 text-sm text-slate-500">{section.description}</p> : null}
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              {fields.map((field) => renderDynamicField(field))}
+            </div>
+          </section>
+        );
+      })}
+
+      {false ? (
+        <>
       <section className="card p-5">
         <h2 className="text-base font-bold">1. 担当・会社・担当者</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -509,6 +704,8 @@ export function AppointmentForm({
           ))}
         </div>
       </section>
+        </>
+      ) : null}
 
       <div className="sticky bottom-4 flex justify-end">
         <button className="primary-button min-w-40" disabled={pending || filteredIsUsers.length === 0}>
