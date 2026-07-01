@@ -75,11 +75,12 @@ export function TaskManager({
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     const response = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        readTaskForm(event.currentTarget, createRelatedType),
+        readTaskForm(formElement, createRelatedType),
       ),
     });
     const result = await response.json();
@@ -87,16 +88,17 @@ export function TaskManager({
       return setError(result.message ?? "作成できませんでした。");
     setOpen(false);
     setError("");
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 
   async function save(id: string, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     const response = await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(readTaskForm(event.currentTarget, editRelatedType)),
+      body: JSON.stringify(readTaskForm(formElement, editRelatedType)),
     });
     const result = await response.json();
     if (!response.ok)

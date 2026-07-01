@@ -39,6 +39,7 @@ export async function PUT(request: Request) {
       userId: context.user.id,
       writeCalendarId: input.writeCalendarId,
       busyCalendarIds: input.busyCalendarIds,
+      watchCalendarId: input.watchCalendarId,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

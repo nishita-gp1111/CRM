@@ -50,11 +50,12 @@ export function MemberManagement({
 
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPending(true);
     setError("");
     setMessage("");
     setInvitationUrl("");
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(formElement);
     const response = await fetch("/api/organizations/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -73,7 +74,7 @@ export function MemberManagement({
       "招待URLを発行しました。メール配信連携前は、このURLを招待先へ共有してください。",
     );
     setInvitationUrl(result.invitationUrl);
-    event.currentTarget.reset();
+    formElement.reset();
   }
 
   async function updateMember(memberId: string, role: Role) {

@@ -757,6 +757,7 @@ export const bookingMutationSchema = z.object({
 export const googleCalendarSelectionSchema = z.object({
   writeCalendarId: z.string().trim().min(1).max(240),
   busyCalendarIds: z.array(z.string().trim().min(1).max(240)).default([]),
+  watchCalendarId: z.string().trim().min(1).max(240).nullable().optional(),
 });
 
 export const googleCalendarWebhookSchema = z.object({

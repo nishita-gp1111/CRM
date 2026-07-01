@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { createRecordActivity } from "@/lib/crm";
-import { deleteTaskGoogleEvent } from "@/lib/google-calendar";
+import { deleteTaskGoogleEventSafely } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 import { canEditTask } from "@/lib/tasks";
 import { taskStatusSchema } from "@/lib/validation";
@@ -44,13 +44,9 @@ export async function PATCH(request: Request, { params }: Params) {
             input.status === "COMPLETED"
               ? (current.completedAt ?? new Date())
               : null,
-          calendarSyncEnabled: finished ? false : current.calendarSyncEnabled,
-          calendarSyncStatus: finished
-            ? "NOT_REQUIRED"
-            : current.calendarSyncStatus,
-          googleCalendarId: finished ? null : current.googleCalendarId,
-          googleEventId: finished ? null : current.googleEventId,
-          googleEventHtmlLink: finished ? null : current.googleEventHtmlLink,
+          calendarSyncEnabled: finished
+            ? false
+            : current.calendarSyncEnabled,
         },
       });
       if (finished)
@@ -117,11 +113,14 @@ export async function PATCH(request: Request, { params }: Params) {
       return updated;
     });
     if (finished)
-      await deleteTaskGoogleEvent({
+      await deleteTaskGoogleEventSafely({
         organizationId: context.organization.id,
         userId: current.ownerUserId,
         calendarId: current.googleCalendarId,
         eventId: current.googleEventId,
+        taskId: id,
+        reason: input.status,
+        clearTaskOnSuccess: true,
       });
     return NextResponse.json({ item });
   } catch (error) {

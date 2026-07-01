@@ -86,7 +86,8 @@ export function ActionPlanPanel({
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const ok = await request("/api/action-plans", "POST", {
       title: stringValue(form, "title"),
       description: nullableValue(form, "description"),
@@ -98,7 +99,7 @@ export function ActionPlanPanel({
       priority: stringValue(form, "priority") || "MEDIUM",
       status: "NOT_STARTED",
     });
-    if (ok) event.currentTarget.reset();
+    if (ok) formElement.reset();
   }
 
   async function update(event: FormEvent<HTMLFormElement>, id: string) {

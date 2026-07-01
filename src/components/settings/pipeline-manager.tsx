@@ -38,7 +38,8 @@ export function PipelineManager({
 
   async function createPipeline(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const data = new FormData(formElement);
     const response = await fetch("/api/pipelines", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,7 +49,7 @@ export function PipelineManager({
     if (!response.ok) return setError(result.message);
     setSelected(result.item.id);
     setError("");
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 
@@ -106,7 +107,8 @@ export function PipelineManager({
   async function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!pipeline) return;
-    const data = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const data = new FormData(formElement);
     const response = await fetch("/api/pipeline-stages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -124,7 +126,7 @@ export function PipelineManager({
     const result = await response.json();
     if (!response.ok) return setError(result.message);
     setError("");
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 

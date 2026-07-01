@@ -136,6 +136,46 @@ function isAuthGoogleError(error: unknown) {
   return error instanceof GoogleApiError && [401, 403].includes(error.status);
 }
 
+type GoogleReminderOverride = { method: "popup"; minutes: number };
+
+export function googleReminderOverridesFromScheduledTimes(input: {
+  dueDate: Date;
+  scheduledTimes: Array<Date | string>;
+}): GoogleReminderOverride[] {
+  const dueTime = input.dueDate.getTime();
+  const minutes = input.scheduledTimes
+    .map((scheduledAt) => {
+      const scheduledTime = new Date(scheduledAt).getTime();
+      if (Number.isNaN(scheduledTime)) return null;
+      return Math.round((dueTime - scheduledTime) / 60_000);
+    })
+    .filter((item): item is number => item !== null && item >= 0);
+  return [...new Set(minutes)]
+    .sort((a, b) => a - b)
+    .map((item) => ({ method: "popup", minutes: item }));
+}
+
+export function resolveWatchCalendarId(input: {
+  requestedCalendarId?: string | null;
+  selectedWriteCalendarId?: string | null;
+  selections: Array<{ googleCalendarId: string; isWriteCalendar: boolean }>;
+}) {
+  const requested = input.requestedCalendarId?.trim();
+  if (
+    requested &&
+    (requested === input.selectedWriteCalendarId ||
+      input.selections.some((item) => item.googleCalendarId === requested))
+  ) {
+    return requested;
+  }
+  if (requested) return null;
+  return (
+    input.selections.find((item) => item.isWriteCalendar)?.googleCalendarId ??
+    input.selectedWriteCalendarId ??
+    null
+  );
+}
+
 export async function createGoogleCalendarOAuthUrl(input: {
   organizationId: string;
   userId: string;
@@ -374,6 +414,7 @@ export async function updateCalendarSelection(input: {
   userId: string;
   writeCalendarId: string;
   busyCalendarIds: string[];
+  watchCalendarId?: string | null;
 }) {
   const connection = await prisma.googleCalendarConnection.findUnique({
     where: {
@@ -403,7 +444,8 @@ export async function updateCalendarSelection(input: {
         .filter(
           (calendar) =>
             calendar.id === input.writeCalendarId ||
-            input.busyCalendarIds.includes(calendar.id),
+            input.busyCalendarIds.includes(calendar.id) ||
+            calendar.id === input.watchCalendarId,
         )
         .map((calendar) => ({
           connectionId: connection.id,
@@ -602,22 +644,14 @@ async function googleTaskEventBody(input: {
     where: {
       taskId: input.task.id,
       channel: "IN_APP",
-      status: { not: "CANCELED" },
+      status: { in: ["PENDING", "FAILED", "PROCESSING"] },
     },
     orderBy: { scheduledAt: "asc" },
   });
-  const overrides = reminderOverrides
-    .map((reminder) => {
-      const minutes = Math.round(
-        ((input.task.dueDate as Date).getTime() -
-          reminder.scheduledAt.getTime()) /
-          60_000,
-      );
-      return minutes >= 0 ? { method: "popup", minutes } : null;
-    })
-    .filter((item): item is { method: "popup"; minutes: number } =>
-      Boolean(item),
-    );
+  const overrides = googleReminderOverridesFromScheduledTimes({
+    dueDate: input.task.dueDate,
+    scheduledTimes: reminderOverrides.map((reminder) => reminder.scheduledAt),
+  });
   return {
     id: input.eventId,
     summary: `[CRMタスク] ${deal?.name ?? "商談未設定"} / ${input.task.title}`,
@@ -639,8 +673,8 @@ async function googleTaskEventBody(input: {
       timeZone: input.task.timezone,
     },
     reminders: {
-      useDefault: overrides.length === 0,
-      overrides: overrides.length ? overrides : undefined,
+      useDefault: false,
+      overrides,
     },
     extendedProperties: {
       private: {
@@ -858,6 +892,103 @@ export async function deleteTaskGoogleEvent(input: {
   } catch (error) {
     if (error instanceof GoogleApiError && error.status === 404) return;
     throw error;
+  }
+}
+
+export function taskCalendarDeleteSuccessData(now = new Date()) {
+  return {
+    calendarSyncEnabled: false,
+    calendarSyncStatus: CalendarSyncStatus.NOT_REQUIRED,
+    googleCalendarId: null,
+    googleEventId: null,
+    googleEventHtmlLink: null,
+    calendarLastSyncedAt: now,
+    calendarSyncErrorCode: null,
+    calendarSyncErrorMessage: null,
+    calendarNextRetryAt: null,
+  } satisfies Prisma.TaskUpdateInput;
+}
+
+export function taskCalendarDeleteFailureData(error: unknown) {
+  const status = isAuthGoogleError(error)
+    ? CalendarSyncStatus.REAUTH_REQUIRED
+    : CalendarSyncStatus.ERROR;
+  return {
+    calendarSyncStatus: status,
+    calendarSyncAttemptCount: { increment: 1 },
+    calendarSyncErrorCode:
+      error instanceof GoogleApiError ? error.code : "GOOGLE_EVENT_DELETE_FAILED",
+    calendarSyncErrorMessage:
+      status === CalendarSyncStatus.REAUTH_REQUIRED
+        ? "Google Calendarの再認可が必要です。"
+        : "Google Calendarイベントの削除に失敗しました。",
+    calendarNextRetryAt: null,
+  } satisfies Prisma.TaskUpdateInput;
+}
+
+export async function deleteTaskGoogleEventSafely(input: {
+  organizationId: string;
+  userId: string;
+  calendarId: string | null;
+  eventId: string | null;
+  taskId?: string | null;
+  taskIdForLog?: string | null;
+  reason?: string;
+  clearTaskOnSuccess?: boolean;
+}) {
+  const hasGoogleEvent = Boolean(input.calendarId && input.eventId);
+  if (!hasGoogleEvent || !isGoogleCalendarIntegrationEnabled()) {
+    if (input.taskId && input.clearTaskOnSuccess) {
+      await prisma.task.update({
+        where: { id: input.taskId },
+        data: taskCalendarDeleteSuccessData(),
+      });
+    }
+    return { ok: true, skipped: true };
+  }
+
+  try {
+    await deleteTaskGoogleEvent(input);
+    if (input.taskId && input.clearTaskOnSuccess) {
+      await prisma.task.update({
+        where: { id: input.taskId },
+        data: taskCalendarDeleteSuccessData(),
+      });
+    }
+    return { ok: true, skipped: false };
+  } catch (error) {
+    const data = taskCalendarDeleteFailureData(error);
+    if (input.taskId) {
+      await prisma.task.update({ where: { id: input.taskId }, data });
+      await createTaskCalendarActivity(
+        input.taskId,
+        "Google Calendarイベントの削除に失敗しました",
+      );
+    } else {
+      await prisma.operationalEvent.create({
+        data: {
+          organizationId: input.organizationId,
+          eventType: OperationalEventType.GOOGLE_SYNC_FAILED,
+          status: "TASK_EVENT_DELETE_FAILED",
+          metadata: {
+            taskId: input.taskId ?? input.taskIdForLog ?? null,
+            calendarId: input.calendarId,
+            eventId: input.eventId,
+            reason: input.reason ?? null,
+            errorCode:
+              error instanceof GoogleApiError
+                ? error.code
+                : "GOOGLE_EVENT_DELETE_FAILED",
+          },
+        },
+      });
+    }
+    return {
+      ok: false,
+      skipped: false,
+      status: data.calendarSyncStatus,
+      errorCode: data.calendarSyncErrorCode,
+    };
   }
 }
 

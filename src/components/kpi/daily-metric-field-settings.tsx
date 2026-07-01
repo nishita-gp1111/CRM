@@ -74,7 +74,8 @@ export function DailyMetricFieldSettings({
 
   async function createNew(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     await request("/api/daily-metric-field-configs", "POST", {
       mode: "new",
       businessUnitId: selectedBusinessUnitId,
@@ -84,7 +85,7 @@ export function DailyMetricFieldSettings({
       unit: String(form.get("unit") ?? "COUNT"),
       displayOrder: Number(form.get("displayOrder") ?? 0),
     });
-    event.currentTarget.reset();
+    formElement.reset();
   }
 
   async function toggle(row: Row, isEnabled: boolean) {

@@ -137,11 +137,12 @@ export function DeliveryProjectActions({
 
   async function rejectHandoff(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     await submitJson(`/api/delivery-projects/${project.id}/handoff/reject`, "POST", {
       rejectionReason: form.get("rejectionReason"),
     });
-    event.currentTarget.reset();
+    formElement.reset();
   }
 
   async function createCrossSell(event: FormEvent<HTMLFormElement>) {

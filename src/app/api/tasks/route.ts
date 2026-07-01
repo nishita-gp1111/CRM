@@ -121,6 +121,10 @@ export async function POST(request: Request) {
         input.relatedObjectId,
         true,
       );
+    const activeStatus = !["COMPLETED", "CANCELED"].includes(input.status);
+    const shouldSyncCalendar = Boolean(
+      activeStatus && input.calendarSyncEnabled && input.dueDate,
+    );
     const task = await prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
@@ -133,8 +137,8 @@ export async function POST(request: Request) {
           deliveryProjectId: deliveryProject?.id ?? null,
           durationMinutes: input.durationMinutes ?? 30,
           timezone: input.timezone,
-          calendarSyncEnabled: input.calendarSyncEnabled,
-          calendarSyncStatus: input.calendarSyncEnabled
+          calendarSyncEnabled: shouldSyncCalendar,
+          calendarSyncStatus: shouldSyncCalendar
             ? CalendarSyncStatus.PENDING
             : CalendarSyncStatus.NOT_REQUIRED,
           status: input.status,
@@ -143,18 +147,20 @@ export async function POST(request: Request) {
           completedAt: input.status === "COMPLETED" ? new Date() : null,
         },
       });
-      const reminders = buildReminderRows({
-        organizationId: context.organization.id,
-        taskId: created.id,
-        recipientUserId: input.ownerUserId,
-        dueDate: input.dueDate ?? null,
-        offsets: input.reminderOffsets,
-      });
-      if (reminders.length)
-        await tx.taskReminder.createMany({
-          data: reminders,
-          skipDuplicates: true,
+      if (activeStatus) {
+        const reminders = buildReminderRows({
+          organizationId: context.organization.id,
+          taskId: created.id,
+          recipientUserId: input.ownerUserId,
+          dueDate: input.dueDate ?? null,
+          offsets: input.reminderOffsets,
         });
+        if (reminders.length)
+          await tx.taskReminder.createMany({
+            data: reminders,
+            skipDuplicates: true,
+          });
+      }
       if (input.relatedObjectType && input.relatedObjectId) {
         await tx.objectAssociation.create({
           data: {
@@ -188,7 +194,7 @@ export async function POST(request: Request) {
       }
       return created;
     });
-    if (input.calendarSyncEnabled) await syncTaskToGoogle(task.id);
+    if (shouldSyncCalendar) await syncTaskToGoogle(task.id);
     return NextResponse.json({ item: task }, { status: 201 });
   } catch (error) {
     return apiError(error);

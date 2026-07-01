@@ -91,8 +91,9 @@ export function RecordTaskCard({
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPendingId("create");
-    const payload = readTaskForm(event.currentTarget, context);
+    const payload = readTaskForm(formElement, context);
     const response = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,17 +105,18 @@ export function RecordTaskCard({
       return setError(result.message ?? "作成できませんでした。");
     setOpen(false);
     setError("");
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 
   async function save(id: string, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPendingId(id);
     const response = await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(readTaskForm(event.currentTarget, context)),
+      body: JSON.stringify(readTaskForm(formElement, context)),
     });
     const result = await response.json();
     setPendingId(null);

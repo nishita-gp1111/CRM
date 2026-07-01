@@ -239,7 +239,8 @@ export function DealLineItemManager({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const productId = String(form.get("productId") ?? "") || null;
     const product = products.find((item) => item.id === productId);
     const customFields: Record<string, unknown> = {};
@@ -300,7 +301,7 @@ export function DealLineItemManager({
       editing ? "商品明細を更新しました。" : "商品明細を追加しました。",
     );
     resetToNew();
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 

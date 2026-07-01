@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { apiError, BadRequestError } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { isGoogleCalendarIntegrationEnabled } from "@/lib/feature-flags";
-import { createWatchChannel, renewWatchChannels } from "@/lib/google-calendar";
+import {
+  createWatchChannel,
+  renewWatchChannels,
+  resolveWatchCalendarId,
+} from "@/lib/google-calendar";
 import { Permission, requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -36,17 +40,30 @@ export async function POST(request: Request) {
       },
     });
     if (!connection) throw new BadRequestError("Google Calendarが接続されていません。");
-    const selection = typeof body.selectionId === "string"
-      ? await prisma.googleCalendarSelection.findFirst({
-          where: { id: body.selectionId, connectionId: connection.id },
-        })
-      : await prisma.googleCalendarSelection.findFirst({
-          where: { connectionId: connection.id, isWriteCalendar: true },
-        });
-    if (!selection) throw new BadRequestError("Watch対象のカレンダーが選択されていません。");
+    const selections = await prisma.googleCalendarSelection.findMany({
+      where: { connectionId: connection.id },
+    });
+    const selection =
+      typeof body.selectionId === "string"
+        ? selections.find((item) => item.id === body.selectionId)
+        : null;
+    const googleCalendarId =
+      selection?.googleCalendarId ??
+      resolveWatchCalendarId({
+        requestedCalendarId:
+          typeof body.googleCalendarId === "string"
+            ? body.googleCalendarId
+            : null,
+        selectedWriteCalendarId: connection.selectedWriteCalendarId,
+        selections,
+      });
+    if (!googleCalendarId)
+      throw new BadRequestError(
+        "Watch対象のカレンダーが選択されていません。Google CalendarからCRMへの変更検知を使うには、Watch対象カレンダーを選択してください。CRMからGoogle Calendarへの予定作成・更新は引き続き利用できます。",
+      );
     const channel = await createWatchChannel({
       connectionId: connection.id,
-      googleCalendarId: selection.googleCalendarId,
+      googleCalendarId,
     });
     return NextResponse.json({ ok: true, channelId: channel.channelId });
   } catch (error) {

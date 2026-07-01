@@ -6,7 +6,10 @@ import {
   createRecordActivity,
   validateOwner,
 } from "@/lib/crm";
-import { deleteTaskGoogleEvent, syncTaskToGoogle } from "@/lib/google-calendar";
+import {
+  deleteTaskGoogleEventSafely,
+  syncTaskToGoogle,
+} from "@/lib/google-calendar";
 import { AuthorizationError } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import {
@@ -98,13 +101,9 @@ export async function PATCH(request: Request, { params }: Params) {
           timezone: input.timezone,
           calendarSyncEnabled: shouldSyncCalendar,
           calendarSyncStatus: shouldSyncCalendar ? "PENDING" : "NOT_REQUIRED",
-          googleCalendarId: shouldSyncCalendar
-            ? current.googleCalendarId
-            : null,
-          googleEventId: shouldSyncCalendar ? current.googleEventId : null,
-          googleEventHtmlLink: shouldSyncCalendar
-            ? current.googleEventHtmlLink
-            : null,
+          googleCalendarId: current.googleCalendarId,
+          googleEventId: current.googleEventId,
+          googleEventHtmlLink: current.googleEventHtmlLink,
           status: input.status,
           priority: input.priority,
           taskType: input.taskType,
@@ -190,19 +189,35 @@ export async function PATCH(request: Request, { params }: Params) {
       oldCalendar.googleCalendarId &&
       oldCalendar.googleEventId
     ) {
-      await deleteTaskGoogleEvent({
+      await deleteTaskGoogleEventSafely({
         organizationId: context.organization.id,
         userId: oldCalendar.ownerUserId,
         calendarId: oldCalendar.googleCalendarId,
         eventId: oldCalendar.googleEventId,
+        taskId: id,
+        reason: "OWNER_CHANGED",
+        clearTaskOnSuccess: false,
       });
     }
     if (!input.dueDate || ["COMPLETED", "CANCELED"].includes(input.status)) {
-      await deleteTaskGoogleEvent({
+      await deleteTaskGoogleEventSafely({
         organizationId: context.organization.id,
         userId: oldCalendar.ownerUserId,
         calendarId: oldCalendar.googleCalendarId,
         eventId: oldCalendar.googleEventId,
+        taskId: id,
+        reason: input.status,
+        clearTaskOnSuccess: true,
+      });
+    } else if (!input.calendarSyncEnabled) {
+      await deleteTaskGoogleEventSafely({
+        organizationId: context.organization.id,
+        userId: oldCalendar.ownerUserId,
+        calendarId: oldCalendar.googleCalendarId,
+        eventId: oldCalendar.googleEventId,
+        taskId: id,
+        reason: "SYNC_DISABLED",
+        clearTaskOnSuccess: true,
       });
     } else if (input.calendarSyncEnabled) {
       await syncTaskToGoogle(id);
@@ -230,12 +245,6 @@ export async function DELETE(_: Request, { params }: Params) {
         { status: 404 },
       );
     await canEditTask(context, current.ownerUserId);
-    await deleteTaskGoogleEvent({
-      organizationId: context.organization.id,
-      userId: current.ownerUserId,
-      calendarId: current.googleCalendarId,
-      eventId: current.googleEventId,
-    });
     await prisma.$transaction([
       prisma.taskReminder.updateMany({
         where: { organizationId: context.organization.id, taskId: id },
@@ -250,6 +259,15 @@ export async function DELETE(_: Request, { params }: Params) {
       }),
       prisma.task.delete({ where: { id } }),
     ]);
+    await deleteTaskGoogleEventSafely({
+      organizationId: context.organization.id,
+      userId: current.ownerUserId,
+      calendarId: current.googleCalendarId,
+      eventId: current.googleEventId,
+      taskIdForLog: id,
+      reason: "TASK_DELETED",
+      clearTaskOnSuccess: false,
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiError(error);

@@ -43,9 +43,29 @@ type BookingItem = {
 };
 type GoogleConnection = {
   status: string;
+  googleEmail: string | null;
+  selectedWriteCalendarId: string | null;
   selectedWriteCalendarName: string | null;
   lastConnectedAt: string | null;
+  selections: CalendarSelection[];
 } | null;
+type CalendarSelection = {
+  id: string;
+  googleCalendarId: string;
+  calendarName: string;
+  accessRole: string | null;
+  isWriteCalendar: boolean;
+  useForBusyCheck: boolean;
+  timezone: string | null;
+};
+type CalendarOption = {
+  id: string;
+  name: string;
+  accessRole: string | null;
+  timezone: string | null;
+  writable: boolean;
+  primary: boolean;
+};
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const minutesToTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -75,6 +95,36 @@ export function MeetingManager({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [googleCalendarTestPending, setGoogleCalendarTestPending] = useState(false);
+  const savedBusyCalendarIds =
+    googleConnection?.selections
+      .filter((selection) => selection.useForBusyCheck)
+      .map((selection) => selection.googleCalendarId) ?? [];
+  const savedCalendarOptions =
+    googleConnection?.selections.map((selection) => ({
+      id: selection.googleCalendarId,
+      name: selection.calendarName,
+      accessRole: selection.accessRole,
+      timezone: selection.timezone,
+      writable: selection.accessRole === "owner",
+      primary: selection.googleCalendarId === "primary",
+    })) ?? [];
+  const [calendarOptions, setCalendarOptions] =
+    useState<CalendarOption[]>(savedCalendarOptions);
+  const [writeCalendarId, setWriteCalendarId] = useState(
+    googleConnection?.selectedWriteCalendarId ??
+      googleConnection?.selections.find((selection) => selection.isWriteCalendar)
+        ?.googleCalendarId ??
+      "",
+  );
+  const [busyCalendarIds, setBusyCalendarIds] =
+    useState<string[]>(savedBusyCalendarIds);
+  const [watchCalendarId, setWatchCalendarId] = useState(
+    googleConnection?.selectedWriteCalendarId ??
+      googleConnection?.selections.find((selection) => selection.isWriteCalendar)
+        ?.googleCalendarId ??
+      "",
+  );
+  const [calendarSettingsPending, setCalendarSettingsPending] = useState(false);
   async function saveAvailability(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -175,67 +225,262 @@ export function MeetingManager({
       setGoogleCalendarTestPending(false);
     }
   }
+
+  async function loadGoogleCalendars() {
+    setCalendarSettingsPending(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/integrations/google-calendar/calendars");
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(result.message ?? "カレンダー候補を取得できませんでした。");
+        return;
+      }
+      const items = Array.isArray(result.items)
+        ? (result.items as CalendarOption[])
+        : [];
+      setCalendarOptions(items);
+      const fallbackWrite =
+        writeCalendarId ||
+        items.find((item) => item.primary && item.writable)?.id ||
+        items.find((item) => item.writable)?.id ||
+        "";
+      if (!writeCalendarId) setWriteCalendarId(fallbackWrite);
+      if (!watchCalendarId) setWatchCalendarId(fallbackWrite);
+      if (!busyCalendarIds.length && fallbackWrite)
+        setBusyCalendarIds([fallbackWrite]);
+      setMessage(`カレンダー候補を取得しました。${items.length}件`);
+    } catch (loadError) {
+      console.error("Google Calendar list request failed", loadError);
+      setError("カレンダー候補を取得できませんでした。通信状態を確認してください。");
+    } finally {
+      setCalendarSettingsPending(false);
+    }
+  }
+
+  async function saveGoogleCalendarSelection() {
+    if (!writeCalendarId) {
+      setError("書き込みカレンダーを選択してください。");
+      return;
+    }
+    setCalendarSettingsPending(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/integrations/google-calendar/calendars", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          writeCalendarId,
+          busyCalendarIds,
+          watchCalendarId: watchCalendarId || writeCalendarId,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(result.message ?? "カレンダー設定を保存できませんでした。");
+        return;
+      }
+      setMessage("カレンダー設定を保存しました。");
+      router.refresh();
+    } catch (saveError) {
+      console.error("Google Calendar selection save failed", saveError);
+      setError("カレンダー設定を保存できませんでした。通信状態を確認してください。");
+    } finally {
+      setCalendarSettingsPending(false);
+    }
+  }
+
+  function toggleBusyCalendar(calendarId: string, checked: boolean) {
+    setBusyCalendarIds((current) =>
+      checked
+        ? [...new Set([...current, calendarId])]
+        : current.filter((item) => item !== calendarId),
+    );
+  }
+
+  async function recreateWatch() {
+    await postAction("/api/integrations/google-calendar/watch", {
+      googleCalendarId: watchCalendarId || writeCalendarId || null,
+    });
+  }
   return (
     <div className="space-y-6">
-      <section className="card flex flex-col justify-between gap-4 p-6 md:flex-row md:items-center">
-        <div>
-          <h2 className="text-lg font-bold">Google Calendar</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {!googleCalendarEnabled
-              ? "Google Calendar連携はfeature flagで停止中です。"
-              : googleConnection?.status === "CONNECTED"
-              ? `接続済み${googleConnection.selectedWriteCalendarName ? ` / ${googleConnection.selectedWriteCalendarName}` : ""}`
-              : "未接続です。Google Calendarだけを認可します。"}
-          </p>
-          {!publicSchedulingEnabled ? (
-            <p className="mt-1 text-sm font-bold text-amber-700">
-              公開日程調整はfeature flagで停止中です。
+      <section className="card p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <h2 className="text-lg font-bold">Google Calendar</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {!googleCalendarEnabled
+                ? "Google Calendar連携はfeature flagで停止中です。"
+                : googleConnection?.status === "CONNECTED"
+                  ? `接続済み${googleConnection.selectedWriteCalendarName ? ` / ${googleConnection.selectedWriteCalendarName}` : ""}`
+                  : "未接続です。Google Calendarだけを認可します。"}
             </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            className="primary-button"
-            href="/api/integrations/google-calendar/connect?redirectPath=/meetings"
-            aria-disabled={!googleCalendarEnabled}
-          >
-            接続する
-          </a>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={!googleCalendarEnabled || googleCalendarTestPending}
-            onClick={testGoogleCalendarConnection}
-          >
-            {googleCalendarTestPending ? "確認中..." : "接続テスト"}
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={!googleCalendarEnabled}
-            onClick={() => postAction("/api/integrations/google-calendar/sync", { mode: "INCREMENTAL" })}
-          >
-            増分同期
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={!googleCalendarEnabled}
-            onClick={() => postAction("/api/integrations/google-calendar/watch", {})}
-          >
-            Watch再作成
-          </button>
+            {googleConnection?.googleEmail ? (
+              <p className="mt-1 text-xs font-bold text-slate-400">
+                {googleConnection.googleEmail}
+              </p>
+            ) : null}
+            {!publicSchedulingEnabled ? (
+              <p className="mt-1 text-sm font-bold text-amber-700">
+                公開日程調整はfeature flagで停止中です。
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="primary-button"
+              href="/api/integrations/google-calendar/connect?redirectPath=/meetings"
+              aria-disabled={!googleCalendarEnabled}
+            >
+              接続する
+            </a>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!googleCalendarEnabled || googleCalendarTestPending}
+              onClick={testGoogleCalendarConnection}
+            >
+              {googleCalendarTestPending ? "確認中..." : "接続テスト"}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!googleCalendarEnabled}
+              onClick={() =>
+                postAction("/api/integrations/google-calendar/sync", {
+                  mode: "INCREMENTAL",
+                })
+              }
+            >
+              増分同期
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!googleCalendarEnabled}
+              onClick={recreateWatch}
+            >
+              Watch再作成
+            </button>
+          </div>
         </div>
         {error ? (
-          <p role="alert" className="text-sm font-bold text-red-600">
+          <p role="alert" className="mt-4 text-sm font-bold text-red-600">
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" className="text-sm font-bold text-brand-700">
+          <p role="status" className="mt-4 text-sm font-bold text-brand-700">
             {message}
           </p>
         ) : null}
+        <div className="mt-5 border-t border-line pt-5">
+          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+            <div>
+              <h3 className="text-sm font-bold text-ink">
+                カレンダー同期設定
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Watch未設定でも、CRMからGoogle Calendarへの予定作成・更新・削除は利用できます。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!googleCalendarEnabled || calendarSettingsPending}
+                onClick={loadGoogleCalendars}
+              >
+                {calendarSettingsPending ? "取得中..." : "候補を取得"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={
+                  !googleCalendarEnabled ||
+                  calendarSettingsPending ||
+                  !writeCalendarId
+                }
+                onClick={saveGoogleCalendarSelection}
+              >
+                設定を保存
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <label>
+              <span className="field-label">書き込みカレンダー</span>
+              <select
+                className="text-field"
+                value={writeCalendarId}
+                onChange={(event) => {
+                  setWriteCalendarId(event.target.value);
+                  if (!watchCalendarId) setWatchCalendarId(event.target.value);
+                }}
+                disabled={!calendarOptions.length}
+              >
+                <option value="">選択してください</option>
+                {calendarOptions
+                  .filter((calendar) => calendar.writable)
+                  .map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              <span className="field-label">Watch対象カレンダー</span>
+              <select
+                className="text-field"
+                value={watchCalendarId}
+                onChange={(event) => setWatchCalendarId(event.target.value)}
+                disabled={!calendarOptions.length}
+              >
+                <option value="">選択してください</option>
+                {calendarOptions.map((calendar) => (
+                  <option key={calendar.id} value={calendar.id}>
+                    {calendar.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <span className="field-label">空き時間確認カレンダー</span>
+              <div className="max-h-36 space-y-2 overflow-auto rounded-lg border border-line bg-white p-3">
+                {calendarOptions.length ? (
+                  calendarOptions.map((calendar) => (
+                    <label
+                      key={calendar.id}
+                      className="flex items-center gap-2 text-sm font-medium text-slate-600"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={busyCalendarIds.includes(calendar.id)}
+                        onChange={(event) =>
+                          toggleBusyCalendar(calendar.id, event.target.checked)
+                        }
+                      />
+                      {calendar.name}
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    候補取得後に選択できます。
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          {!watchCalendarId ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700">
+              Google CalendarからCRMへの変更検知を使うには、Watch対象カレンダーを選択してください。CRMからGoogle Calendarへの予定作成・更新は引き続き利用できます。
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">

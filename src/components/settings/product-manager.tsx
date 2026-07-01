@@ -185,7 +185,8 @@ export function ProductManager({
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const businessUnitIds = businessUnits
       .filter((unit) => form.get(`businessUnit:${unit.id}`) === "on")
       .map((unit) => unit.id);
@@ -231,14 +232,15 @@ export function ProductManager({
     if (ok) {
       setMessage(editing ? "商品を更新しました。" : "商品を作成しました。");
       setEditing(null);
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 
   async function addPrice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedProduct) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const ok = await submitJson(
       `/api/products/${selectedProduct.id}/prices`,
       "POST",
@@ -258,14 +260,15 @@ export function ProductManager({
     );
     if (ok) {
       setMessage("価格を追加しました。");
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 
   async function addProperty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedProduct) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const options = String(form.get("options") ?? "")
       .split(/[,\n]/)
       .map((item) => item.trim())
@@ -288,13 +291,14 @@ export function ProductManager({
     );
     if (ok) {
       setMessage("商材プロパティを追加しました。");
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 
   async function addAttachmentRule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const baseProductIds = products
       .filter((product) => form.get(`baseProduct:${product.id}`) === "on")
       .map((product) => product.id);
@@ -312,13 +316,14 @@ export function ProductManager({
     });
     if (ok) {
       setMessage("付帯率ルールを作成しました。");
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 
   async function addLossReason(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const applicableStatus = [
       "LOST",
       "CANCELLED",
@@ -339,7 +344,7 @@ export function ProductManager({
     });
     if (ok) {
       setMessage("失注理由を追加しました。");
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 

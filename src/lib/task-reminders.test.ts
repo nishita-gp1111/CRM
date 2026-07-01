@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { googleEventIdForTask } from "./google-calendar";
+import {
+  googleEventIdForTask,
+  googleReminderOverridesFromScheduledTimes,
+  resolveWatchCalendarId,
+} from "./google-calendar";
 import {
   buildReminderRows,
   normalizeReminderOffsets,
@@ -47,5 +51,73 @@ describe("Google task events", () => {
     const taskId = "00000000-0000-0000-0000-000000000002";
     expect(googleEventIdForTask(taskId)).toBe(googleEventIdForTask(taskId));
     expect(googleEventIdForTask(taskId)).toMatch(/^crmtask[a-f0-9]+$/);
+  });
+
+  it("builds one-hour Google reminder overrides", () => {
+    expect(
+      googleReminderOverridesFromScheduledTimes({
+        dueDate: new Date("2026-07-02T02:00:00.000Z"),
+        scheduledTimes: [new Date("2026-07-02T01:00:00.000Z")],
+      }),
+    ).toEqual([{ method: "popup", minutes: 60 }]);
+  });
+
+  it("deduplicates multiple Google reminder overrides", () => {
+    expect(
+      googleReminderOverridesFromScheduledTimes({
+        dueDate: new Date("2026-07-02T02:00:00.000Z"),
+        scheduledTimes: [
+          new Date("2026-07-02T01:30:00.000Z"),
+          new Date("2026-07-02T01:00:00.000Z"),
+          new Date("2026-07-02T01:00:00.000Z"),
+        ],
+      }),
+    ).toEqual([
+      { method: "popup", minutes: 30 },
+      { method: "popup", minutes: 60 },
+    ]);
+  });
+
+  it("uses empty overrides instead of Google defaults when reminders are off", () => {
+    expect(
+      googleReminderOverridesFromScheduledTimes({
+        dueDate: new Date("2026-07-02T02:00:00.000Z"),
+        scheduledTimes: [],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("Google Calendar watch selection", () => {
+  it("uses selected write calendar as the default watch target", () => {
+    expect(
+      resolveWatchCalendarId({
+        selectedWriteCalendarId: "primary",
+        selections: [],
+      }),
+    ).toBe("primary");
+  });
+
+  it("accepts a requested calendar that is already selected", () => {
+    expect(
+      resolveWatchCalendarId({
+        requestedCalendarId: "calendar-2",
+        selectedWriteCalendarId: "calendar-1",
+        selections: [
+          { googleCalendarId: "calendar-1", isWriteCalendar: true },
+          { googleCalendarId: "calendar-2", isWriteCalendar: false },
+        ],
+      }),
+    ).toBe("calendar-2");
+  });
+
+  it("rejects an unknown requested watch calendar", () => {
+    expect(
+      resolveWatchCalendarId({
+        requestedCalendarId: "calendar-3",
+        selectedWriteCalendarId: "calendar-1",
+        selections: [{ googleCalendarId: "calendar-1", isWriteCalendar: true }],
+      }),
+    ).toBeNull();
   });
 });

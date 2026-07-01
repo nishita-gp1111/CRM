@@ -52,6 +52,12 @@ export default async function MeetingsPage() {
       },
     }),
   ]);
+  const googleCalendarSelections = googleConnection
+    ? await prisma.googleCalendarSelection.findMany({
+        where: { connectionId: googleConnection.id },
+        orderBy: [{ isWriteCalendar: "desc" }, { calendarName: "asc" }],
+      })
+    : [];
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeading
@@ -107,9 +113,21 @@ export default async function MeetingsPage() {
           googleConnection
             ? {
                 status: googleConnection.status,
+                googleEmail: googleConnection.googleEmail,
+                selectedWriteCalendarId:
+                  googleConnection.selectedWriteCalendarId,
                 selectedWriteCalendarName:
                   googleConnection.selectedWriteCalendarName,
                 lastConnectedAt: googleConnection.lastConnectedAt?.toISOString() ?? null,
+                selections: googleCalendarSelections.map((selection) => ({
+                  id: selection.id,
+                  googleCalendarId: selection.googleCalendarId,
+                  calendarName: selection.calendarName,
+                  accessRole: selection.accessRole,
+                  isWriteCalendar: selection.isWriteCalendar,
+                  useForBusyCheck: selection.useForBusyCheck,
+                  timezone: selection.timezone,
+                })),
               }
             : null
         }

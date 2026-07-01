@@ -72,7 +72,8 @@ export function CustomPropertyManager({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const options = String(form.get("options") ?? "")
       .split(/[,\n]/)
       .map((value) => value.trim())
@@ -114,7 +115,7 @@ export function CustomPropertyManager({
     setMessage(
       editing ? "カスタム項目を更新しました。" : "カスタム項目を追加しました。",
     );
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
   }
 
