@@ -411,3 +411,54 @@ Google Calendar実同期再検証: `FAIL`
 1. 修正済みコードを `https://crm-hazel-six.vercel.app` またはPreview環境へデプロイする。
 2. `/meetings` で書き込み/Busy/Watch対象カレンダー選択UIが表示されることを確認する。
 3. その状態で、テスト商談・テストタスクを使って実Google Calendar再検証を再実行する。
+
+---
+
+# Google Calendar Deploy Confirmation - 2026-07-01 20:46 JST
+
+## Scope
+
+Google Calendar修正をGitHubへPushし、Vercel Productionへ反映されたことを確認した。
+このセクションは、上記 `2026-07-01 19:40 JST` 時点の未反映判定を上書きする最新確認である。
+
+- 実行日時: `2026-07-01 20:46 JST`
+- 作業ブランチ: `main`
+- Google Calendar修正commit: `0e06fa656175c0373efa0a121f7adbdfc2dcc9d8`
+- Vercel Production deployment URL: `https://crm-jodzedrl2-shonishita-6132s-projects.vercel.app`
+- Vercel Production alias: `https://crm-hazel-six.vercel.app`
+- Vercel deployment status: `READY`
+- Vercel deployment commit: `0e06fa656175c0373efa0a121f7adbdfc2dcc9d8`
+- GitHub push先:
+  - `https://github.com/Nishitasho/CRM.git`
+  - `https://github.com/nishita-gp1111/CRM.git`
+- secret / token / DB URL: ログ出力なし
+
+## Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| GitHub `Nishitasho/CRM` main | PASS | `refs/heads/main` が `0e06fa656175c0373efa0a121f7adbdfc2dcc9d8` を指している。 |
+| GitHub `nishita-gp1111/CRM` main | PASS | `refs/heads/main` が `0e06fa656175c0373efa0a121f7adbdfc2dcc9d8` を指している。 |
+| Vercel Production deploy | PASS | `crm-jodzedrl2-shonishita-6132s-projects.vercel.app` が `READY`。 |
+| Vercel Production alias | PASS | `crm-hazel-six.vercel.app` が同deploymentへalias設定済み。 |
+| `/meetings` UI反映 | PASS | `書き込みカレンダー`、`Watch対象カレンダー`、`空き時間確認カレンダー`、`候補を取得`、`設定を保存`、`Watch再作成` の表示を確認。 |
+| 実Google Calendar再検証 | READY / NOT RUN | 修正UIの本番反映は確認済み。実Googleイベント作成・更新・削除の再検証へ進める状態。 |
+
+## Decision
+
+Google Calendar修正のGit反映・Vercel Production反映: `PASS`
+
+実Google Calendar再検証: `READY / NOT RUN`
+
+理由:
+
+- Google Calendar修正commitは両GitHub remoteへPush済み
+- Vercel Productionは対象commitで `READY`
+- `/meetings` のカレンダー選択UIが本番alias上で表示されている
+- この確認ではGoogle Calendar上の実イベント作成・更新・削除は実施していない
+
+次に実施すること:
+
+1. テスト商談・テストタスクを使う。
+2. Google Calendar追加ONでタスクを作成する。
+3. リマインド、件名、日時、完了時削除、タスク削除時削除、再同期、二重作成防止、Watch再作成を実Google Calendarで確認する。
