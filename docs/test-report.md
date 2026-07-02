@@ -763,3 +763,185 @@ Google Calendar実同期Full PASS判定: `PASS`
 - 件名更新、日時更新、再同期、二重作成防止、完了時イベント削除も確認できた
 - CRM側も `SYNCED` / `NOT_REQUIRED` へ期待通り遷移し、Google event id/linkの保持・クリアが正しく動作した
 - secret、token、DB接続URL、OAuth情報はログ出力していない
+
+---
+
+# IS Appointment Form Google Calendar Sync Retest - 2026-07-02 11:16 JST
+
+## Scope
+
+`/appointments/new` のIS連携フォームで作成される予約が、実Google Calendarへ同期されるかをProductionで確認した。
+新機能追加や仕様変更は行わず、`[TEST]` 付きのテスト会社・テストコンタクト・テスト商談・テスト予約のみを使用した。
+
+- 使用環境: `https://crm-hazel-six.vercel.app`
+- フォーム送信先: `POST /api/appointments`
+- 使用Google Calendar接続: 接続済み
+- 書き込みカレンダー: `西田 翔`
+- Google Calendar UIで確認した閲覧アカウント: `s.nishita@growth-path.jp`
+- 使用予約ID: `93e3f662-839f-4067-b987-a20e19101398`
+- 使用商談ID: `e48e3a5d-205c-4894-8aca-d85764e68013`
+- 使用テストタイトル: `CRM予約 / [TEST] ISフォームGoogle同期 2026-07-02T02-14-06-275Z`
+- 本番顧客データ: 未使用
+- DB接続URL / OAuth token / secret: ログ出力なし
+
+## Executed Operations
+
+Production APIへ通常ログインし、`/appointments/new` と同じ送信APIでテスト予約を作成した。
+その後、Google Calendar UIでイベント表示を確認し、予約日時変更・再同期・キャンセルを実行した。
+
+```bash
+POST /api/appointments
+POST /api/appointments # same idempotencyKey retry
+GET /meetings
+POST /api/bookings/93e3f662-839f-4067-b987-a20e19101398/reschedule
+POST /api/bookings/93e3f662-839f-4067-b987-a20e19101398/sync
+POST /api/bookings/93e3f662-839f-4067-b987-a20e19101398/cancel
+GET /meetings
+```
+
+## Results
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `/appointments/new` 画面表示 | PARTIAL PASS | 画面は表示されたが、本番DB上で `業種` select の候補が空だったため、ブラウザUIだけでの完全な手入力送信は未完了。 |
+| ISフォーム送信APIからアポ登録 | PASS | `POST /api/appointments` が200。会社・コンタクト・商談・予約を作成。 |
+| Google Calendarイベント作成 | PASS | `/meetings` で対象予約が `syncStatus=SYNCED`、`googleEventHtmlLink` あり。 |
+| Googleで開くリンク | PASS | Google Calendarのイベントリンクから実Google Calendar UIへ遷移できた。 |
+| タイトル | PASS | Google Calendar UIのイベントダイアログで `CRM予約 / [TEST] ISフォームGoogle同期 2026-07-02T02-14-06-275Z` を確認。 |
+| 開始・終了時刻 | PASS | 作成後にリスケし、Google Calendar UIで `7月8日(水) 午後4:00～4:30` を確認。 |
+| CRM側SYNCED | PASS | `/meetings` の予約propsで `bookingStatus=RESCHEDULED`, `syncStatus=SYNCED`, `lastSyncedAt=2026-07-02T02:14:10.935Z` を確認。 |
+| アポ日時変更でGoogleイベント更新 | PASS | `POST /api/bookings/:id/reschedule` 後、同一GoogleイベントリンクのUI表示が `16:00-16:30 JST` へ更新。 |
+| 再同期 | PASS | `POST /api/bookings/:id/sync` が `status=SYNCED` を返却。Googleイベントリンクは同一で維持。 |
+| 二重登録防止 | PASS | 同じ `idempotencyKey` で再送し、`duplicated=true` かつ同一 `meetingBookingId` を返却。Googleイベントの二重作成なし。 |
+| キャンセル時のGoogleイベント挙動 | PASS | `POST /api/bookings/:id/cancel` が200。CRM側は `bookingStatus=CANCELLED`, `syncStatus=SYNCED`。Google Calendar UI再読み込み後、対象 `[TEST]` イベントは表示されなくなった。 |
+
+## Observations
+
+- Google Calendar同期そのものは、作成・日時更新・再同期・キャンセル削除・二重登録防止まで期待通り動作した。
+- ただし、`/appointments/new` の `業種` 候補が本番画面で空だった。実ユーザーが画面だけで登録するには、業種マスタ投入またはフォーム設定側の初期値/非表示設定が必要。
+- キャンセル後も予約データには `googleEventHtmlLink` が残る。Google側イベントは削除済みだが、キャンセル済み予約でリンク表示を残すかどうかはUXとして再検討余地あり。
+
+## Decision
+
+IS連携フォームGoogle Calendar実同期判定: `PARTIAL PASS`
+
+理由:
+
+- CRMフォーム送信APIからの予約作成、Google Calendarイベント作成、リンク有効性、タイトル、日時更新、再同期、キャンセル時のGoogleイベント削除、二重登録防止はPASS。
+- 一方で、本番の `/appointments/new` UIは `業種` 候補が空で、ブラウザUIのみでの完全な登録が未確認のため、Full PASSではなく `PARTIAL PASS` とする。
+
+---
+
+# Appointment Industry Master Fix Production Retest - 2026-07-02 11:50 JST
+
+## Scope
+
+Productionの `/appointments/new` で `業種` プルダウン候補が空になり、ブラウザ画面だけではIS連携フォームを完了できない問題を修正した。
+本番顧客データは使用せず、`[TEST]` 付きのテスト会社・テスト担当者・テスト商談・テスト予約のみを使用した。
+
+- 使用環境: `https://crm-hazel-six.vercel.app`
+- 修正commit: `8123da3` / `5541437`
+- 本番顧客データ: 未使用
+- DB接続URL / OAuth token / secret: ログ出力なし
+
+## Cause
+
+- `/appointments/new` の業種取得条件は `organizationId = current organization` かつ `isActive = true`。
+- ProductionのRSC propsで `industries: []` を確認した。
+- 同じProduction画面で、事業部・IS担当者・FS担当者・商品候補は存在していた。
+- `Industry` には `businessUnitId` がなく、事業部絞りによる欠落ではなかった。
+- seedには業種作成処理があるが、Productionではseed依存にできないため、現在組織に有効なIndustryマスタが未投入だったことが原因。
+
+## Fix
+
+- `src/lib/industries.ts` に標準業種12件のidempotent upsert処理を追加。
+- `scripts/bootstrap-industries.ts` を追加し、`--organization-id` または `--organization-slug` 指定で安全に業種投入できるようにした。
+- 書き込み時は `CONFIRM_BOOTSTRAP_INDUSTRIES=true` を必須にした。
+- `POST /api/industries/bootstrap` を追加し、管理権限ユーザーが画面から初期業種を作成できるようにした。
+- `/appointments/new` で業種・商品・IS担当者・FS担当者・事業部が不足している場合は理由を表示し、登録ボタンをdisabledにするようにした。
+- `POST /api/appointments` で `industryId` が同一組織かつ `isActive=true` のIndustryであることを検証するようにした。
+- Client Componentの送信bodyに `appointmentDate` / `startTime` / `endTime` を含め、サーバー側の動的フォーム検証と一致させた。
+
+## Master Bootstrap
+
+Productionでは、デプロイ後にCRMログインセッション経由で `POST /api/industries/bootstrap` を実行した。
+投入結果は12件。
+
+- 飲食
+- 美容
+- 整体・整骨院
+- 医療・クリニック
+- 士業
+- 不動産
+- 建設
+- 小売
+- 教育
+- 介護・福祉
+- 自動車
+- その他
+
+CLIで実行する場合のコマンド:
+
+```bash
+CONFIRM_BOOTSTRAP_INDUSTRIES=true pnpm exec tsx scripts/bootstrap-industries.ts --organization-slug sample
+```
+
+dry run:
+
+```bash
+pnpm exec tsx scripts/bootstrap-industries.ts --organization-slug sample --dry-run
+```
+
+## Production Results
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| 原因確認 | PASS | Production RSC propsで `industries: []`、事業部・IS/FS・商品は存在。 |
+| 業種マスタ投入 | PASS | `POST /api/industries/bootstrap` が200。12件をupsert。 |
+| 業種プルダウン表示 | PASS | `/appointments/new` で `飲食`、`美容`、`整体・整骨院`、`医療・クリニック`、`士業` など12件を確認。 |
+| ブラウザ画面からアポ登録 | PASS | Playwrightで `/appointments/new` を操作し、業種 `飲食` を選択して送信。`アポを登録しました。` を確認。 |
+| 会社作成 | PASS | UI送信レスポンスで `companyId=13546fd1-1e4b-43b9-9a65-a279fc005d05` を確認。 |
+| 担当者作成 | PASS | UI送信レスポンスで `contactId=f7f56fa8-cadb-48a2-b311-104501f0a703` を確認。 |
+| 商談作成 | PASS | UI送信レスポンスで `dealId=c3ab751b-fb0c-4a8a-b290-bf9a05726aff` を確認。 |
+| 予約作成 | PASS | UI送信レスポンスで `meetingBookingId=adcfb7fe-d908-4f91-9da1-4c05566818af` を確認。 |
+| Google Calendarイベント作成 | PASS | `/meetings` propsで対象予約が `syncStatus=SYNCED`、`googleEventHtmlLink` あり。 |
+| CRM側SYNCED | PASS | UI登録予約・API二重防止確認予約の両方で `syncStatus=SYNCED` を確認。 |
+| Googleで開くリンク | PASS | 対象予約にGoogle Calendar event linkが保存された。 |
+| 二重作成防止 | PASS | 別テスト予約で同じ `idempotencyKey` を2回送信し、2回目が `duplicated=true` かつ同一 `meetingBookingId` を返却。 |
+| テストデータ cleanup | PASS | 作成したテスト予約2件をキャンセルし、Google Calendarイベント削除処理も200で完了。 |
+
+## Verification Commands
+
+```bash
+node_modules/.bin/prisma format
+DATABASE_URL=postgresql://user:pass@localhost:5432/salesnest node_modules/.bin/prisma validate
+node_modules/.bin/prisma generate
+node_modules/.bin/eslint . --max-warnings=0
+node_modules/.bin/tsc --noEmit
+node_modules/.bin/vitest run
+node scripts/vercel-build.mjs
+git diff --check
+```
+
+## Verification Results
+
+- `prisma format`: PASS。
+- `prisma validate`: PASS。
+- `prisma generate`: PASS。
+- `eslint . --max-warnings=0`: PASS。
+- `tsc --noEmit`: PASS。
+- `vitest run`: PASS。19 files / 84 tests passed。
+- `node scripts/vercel-build.mjs`: PASS。Next.js production build successful。
+- `git diff --check`: PASS。
+
+## Decision
+
+`/appointments/new` 業種プルダウン復旧判定: `PASS`
+
+理由:
+
+- Productionで業種候補12件が表示された。
+- ブラウザ画面から業種を選択してIS連携フォームを完了できた。
+- 会社・担当者・商談・予約が作成された。
+- Google Calendar同期が `SYNCED` になり、Google event linkも保存された。
+- 同一 `idempotencyKey` の再送で二重作成されないことを確認した。
