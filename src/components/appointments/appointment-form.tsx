@@ -79,6 +79,7 @@ export function AppointmentForm({
   formConfigs,
   submitEndpoint = "/api/appointments",
   passcodeRequired = false,
+  canManageOrganization = false,
   canManageIndustryMaster = false,
   requireFsUser = false,
 }: {
@@ -96,6 +97,7 @@ export function AppointmentForm({
   formConfigs: AppointmentFormConfig[];
   submitEndpoint?: string;
   passcodeRequired?: boolean;
+  canManageOrganization?: boolean;
   canManageIndustryMaster?: boolean;
   requireFsUser?: boolean;
 }) {
@@ -511,6 +513,21 @@ export function AppointmentForm({
               <li key={message}>{message}</li>
             ))}
           </ul>
+          {businessUnits.length === 0 && canManageOrganization ? (
+            <Link className="secondary-button mt-3 inline-flex py-2 text-xs" href="/settings/business-units">
+              事業部設定を開く
+            </Link>
+          ) : null}
+          {industries.length === 0 && canManageIndustryMaster ? (
+            <button
+              className="secondary-button ml-2 mt-3 py-2 text-xs"
+              disabled={bootstrappingIndustries}
+              type="button"
+              onClick={createDefaultIndustries}
+            >
+              {bootstrappingIndustries ? "作成中..." : "初期業種を作成"}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {created ? (

@@ -23,8 +23,12 @@ export default async function NewAppointmentPage() {
   if (!(await canCreateInternalAppointment(context))) redirect("/dashboard");
 
   const canAdminister = canAdministrateInternalAppointments(context);
+  const canManageOrganization = hasPermission(
+    context.membership.role,
+    Permission.MANAGE_ORGANIZATION,
+  );
   const canManageIndustryMaster =
-    hasPermission(context.membership.role, Permission.MANAGE_ORGANIZATION) ||
+    canManageOrganization ||
     hasPermission(context.membership.role, Permission.MANAGE_PRODUCTS) ||
     hasPermission(context.membership.role, Permission.MANAGE_KPI);
   const businessUnits = canAdminister
@@ -42,8 +46,11 @@ export default async function NewAppointmentPage() {
           orderBy: [{ businessUnit: { displayOrder: "asc" } }],
         })
       ).map((membership) => membership.businessUnit);
-  const selectedBusinessUnitId =
-    context.membership.selectedBusinessUnitId ?? businessUnits[0]?.id ?? "";
+  const selectedBusinessUnitId = businessUnits.some(
+    (unit) => unit.id === context.membership.selectedBusinessUnitId,
+  )
+    ? context.membership.selectedBusinessUnitId
+    : businessUnits[0]?.id ?? null;
   const [
     isUsers,
     fsUsers,
@@ -97,7 +104,9 @@ export default async function NewAppointmentPage() {
       where: {
         organizationId: context.organization.id,
         status: "ACTIVE",
-        OR: [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }],
+        OR: selectedBusinessUnitId
+          ? [{ businessUnitId: selectedBusinessUnitId }, { businessUnitId: null }]
+          : [{ businessUnitId: null }],
       },
       select: {
         id: true,
@@ -147,7 +156,7 @@ export default async function NewAppointmentPage() {
       />
       <AppointmentForm
         businessUnits={businessUnits}
-        selectedBusinessUnitId={selectedBusinessUnitId}
+        selectedBusinessUnitId={selectedBusinessUnitId ?? ""}
         currentUserId={context.user.id}
         users={isUsers}
         fsUsers={fsUsers}
@@ -162,6 +171,7 @@ export default async function NewAppointmentPage() {
         callLists={callLists}
         companies={companies}
         formConfigs={formConfigs}
+        canManageOrganization={canManageOrganization}
         canManageIndustryMaster={canManageIndustryMaster}
         requireFsUser
       />
