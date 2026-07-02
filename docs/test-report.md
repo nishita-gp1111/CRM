@@ -693,3 +693,73 @@ Google Calendar実同期Full PASS判定: `FAIL` のまま。
 
 - mockではinsert / patch bodyと `events.get` 保存確認、update fallback、不一致時ERROR化までPASS
 - ただし、実Google Calendar UI上の `1時間前` / `30分前` 通知表示は、修正後デプロイ環境でまだ再確認していない
+
+---
+
+# Google Calendar Reminder Persistence Production Retest - 2026-07-02 10:52 JST
+
+## Scope
+
+Google Calendar reminder保存検証修正commitをProductionへ反映後、実Google Calendar UIで通知分数・件名・日時・再同期・完了時削除を再確認した。
+新機能追加や仕様変更は行わず、テスト商談と `[TEST]` タスクのみを使用した。
+
+- 今回のcommit SHA: `e84e575d3f241d2e1ce264fd45013c9a9d7fbe4b`
+- commit message: `Verify Google Calendar task reminders after sync`
+- Vercel Production Deployment: `dpl_GGTZrTz4mGM2RvKD8zavKwK4j2ZV`
+- Vercel Production Commit: `e84e575`
+- 使用環境: `https://crm-hazel-six.vercel.app`
+- Google Calendar UIで表示されたアカウント: `sho.nishita@crestix-inc.com`
+- Google Calendar UIで確認したカレンダー: `西田 翔`
+- 使用データ: テスト商談 `GC実同期テスト商談 20260701070529`
+- 使用タスク: `[TEST] Google Calendar reminder verify 20260701153837`
+- CRMタスクID: `6891eb28-9a1f-4a72-9d0b-7a3f1f867f23`
+- 本番DB接続URL / OAuth token / secret: ログ出力なし
+- 本番顧客データ: 未使用
+
+## Executed Operations
+
+実行コマンドは一時的なNode fetchスクリプトでProduction APIへログインし、対象 `[TEST]` タスクのみを更新・再同期・完了した。
+認証cookie、token、DB接続URL、OAuth情報はログ出力していない。
+
+```bash
+pnpm exec prisma format
+DATABASE_URL=postgresql://user:pass@localhost:5432/salesnest pnpm exec prisma validate
+pnpm exec prisma generate
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm exec vitest run src/lib/google-calendar-task-sync.test.ts src/lib/task-reminders.test.ts
+pnpm run build
+git diff --check
+```
+
+## Results
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Production反映 | PASS | Vercel Production deployment `dpl_GGTZrTz4mGM2RvKD8zavKwK4j2ZV` がcommit `e84e575` を参照。 |
+| イベント作成 | PASS | CRMでGoogle Calendar追加ON、1時間前リマインド付きで `[TEST]` タスクを作成。CRM側 `Calendar: 同期済み` とGoogle event linkを確認。 |
+| Google Calendar UI上のイベント作成 | PASS | Google Calendar UIで `[CRMタスク] GC実同期テスト商談 20260701070529 / [TEST] Google Calendar reminder verify 20260701153837` を確認。 |
+| 1時間前通知 | PASS | Google Calendar UIの通知欄で `1 時間前` を確認。 |
+| 件名更新 | PASS | CRM側で `[TEST] Google Calendar reminder verify updated 20260701153837` へ変更後、Google Calendar UIの件名も更新後タイトルを表示。 |
+| 30分前通知更新 | PASS | CRM側でリマインドを30分前へ変更後、Google Calendar UIの通知欄で `30 分前` を確認。 |
+| events.get reminders保存確認 | PASS | commit `e84e575` では `events.insert` / `events.patch` 後の `events.get().reminders` が期待値と一致しない場合 `GOOGLE_REMINDER_MISMATCH` / `ERROR` になる。今回の作成・更新・再同期はいずれもCRM側 `SYNCED` で、Google Calendar UIにも `1 時間前` / `30 分前` が表示された。 |
+| 日時更新 | PASS | Production APIで期限を `2026-07-04 11:30 JST` へ更新後、Google Calendar UIで `午前11:30～午後12:00` を確認。 |
+| 再同期 | PASS | `POST /api/tasks/:id/sync` 相当の再同期後も `SYNCED`、Google event id/linkは維持。 |
+| 二重作成防止 | PASS | 再同期後も同一タスクに対するGoogle event idを維持。Google Calendar UI上でも対象 `[TEST]` イベントは1件のみ。 |
+| 完了時イベント削除 | PASS | CRM側で対象タスクを完了後、`status=COMPLETED`、`calendarSyncStatus=NOT_REQUIRED`、`googleEventId` / `googleEventHtmlLink` クリア、未送信リマインド0件。 |
+| Google Calendar UI上の削除確認 | PASS | 完了後にGoogle Calendar UIを確認し、対象 `[TEST]` イベントは一覧から消えた。日付全体の予定数も10件から9件へ減少。 |
+| 本番顧客データ未使用 | PASS | 検証対象はテスト商談と `[TEST]` タスクのみ。 |
+
+## Decision
+
+Google Calendar reminder persistence fix: `PASS`
+
+Google Calendar実同期Full PASS判定: `PASS`
+
+理由:
+
+- Google Calendar UI上で `1 時間前` と `30 分前` の通知表示を確認できた
+- 件名更新、日時更新、再同期、二重作成防止、完了時イベント削除も確認できた
+- CRM側も `SYNCED` / `NOT_REQUIRED` へ期待通り遷移し、Google event id/linkの保持・クリアが正しく動作した
+- secret、token、DB接続URL、OAuth情報はログ出力していない
